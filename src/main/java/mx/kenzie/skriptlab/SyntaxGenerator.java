@@ -300,15 +300,9 @@ public class SyntaxGenerator {
         constructor: {
             final MethodVisitor method = writer.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
             method.visitCode();
-            Label lineMark = new Label();
-            method.visitLabel(lineMark);
-            method.visitLineNumber(7, lineMark);
             method.visitVarInsn(ALOAD, 0);
             method.visitMethodInsn(INVOKESPECIAL, superName, "<init>", "()V", false);
             method.visitInsn(RETURN);
-            Label variableMark = new Label();
-            method.visitLabel(variableMark);
-            method.visitLocalVariable("this", "L" + internalName + ";", null, lineMark, variableMark, 0);
             method.visitMaxs(1, 1);
             method.visitEnd();
         }
@@ -445,7 +439,6 @@ public class SyntaxGenerator {
             method.visitMethodInsn(INVOKEVIRTUAL, internalName, "getChangeType", "(Ljava/lang/reflect/Field;)[Ljava/lang/Class;", false);
             method.visitInsn(ARETURN);
             method.visitLabel(block);
-            method.visitLineNumber(39, block);
             method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
             method.visitInsn(ACONST_NULL);
             method.visitInsn(ARETURN);
@@ -545,7 +538,6 @@ public class SyntaxGenerator {
             method.visitMethodInsn(INVOKEVIRTUAL, internalName, "getChangeType", "(Lch/njol/skript/classes/Changer$ChangeMode;Ljava/lang/reflect/Method;)[Ljava/lang/Class;", false);
             method.visitInsn(ARETURN);
             method.visitLabel(block);
-            method.visitLineNumber(39, block);
             method.visitFrame(Opcodes.F_SAME, 0, null, 0, null);
             method.visitInsn(ACONST_NULL);
             method.visitInsn(ARETURN);
