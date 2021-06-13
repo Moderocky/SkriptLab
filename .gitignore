@@ -1,3 +1,5 @@
 # Project exclude paths
+/ExamplePlugin/
+/.idea/
 /ExamplePlugin/target/
 /target/
