@@ -5,13 +5,12 @@ import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
 import ch.njol.util.Kleenean;
 import org.bukkit.event.Event;
-import org.eclipse.jdt.annotation.Nullable;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
 
-public abstract class GeneratedEffect extends Effect {
+public abstract class GeneratedEffect extends Effect implements GeneratedMember {
     private final Set<Expression<?>> expressions = new HashSet<>();
     
     //region Overridden Stubs
@@ -38,8 +37,12 @@ public abstract class GeneratedEffect extends Effect {
     }
     
     @Override
-    public String toString(@Nullable Event event, boolean b) {
-        return null; // TODO: Create a toString implementation
+    public String toString(Event event, boolean b) {
+        final List<Object> inputs = new ArrayList<>();
+        for (final Expression<?> expression : expressions) {
+            inputs.add(expression.getSingle(event));
+        }
+        return String.format(this.getSyntax().replaceAll("%.+?%", "%s"), inputs.toArray());
     }
     
     @Override

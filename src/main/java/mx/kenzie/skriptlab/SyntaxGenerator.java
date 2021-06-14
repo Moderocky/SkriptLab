@@ -9,6 +9,8 @@ import ch.njol.skript.conditions.base.PropertyCondition;
 import ch.njol.skript.lang.ExpressionType;
 import ch.njol.skript.lang.ParseContext;
 import ch.njol.skript.registrations.Classes;
+import ch.njol.skript.registrations.EventValues;
+import ch.njol.skript.util.Getter;
 import ch.njol.util.coll.CollectionUtils;
 import com.google.common.base.CaseFormat;
 import mx.kenzie.skriptlab.annotation.*;
@@ -16,22 +18,34 @@ import mx.kenzie.skriptlab.error.SyntaxCreationException;
 import mx.kenzie.skriptlab.error.SyntaxLoadException;
 import mx.kenzie.skriptlab.template.*;
 import org.bukkit.Bukkit;
+import org.bukkit.event.Event;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.objectweb.asm.*;
 
 import java.lang.reflect.*;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.objectweb.asm.Opcodes.*;
 
+/**
+ * A syntax generator.
+ * @author Moderocky
+ */
+@SuppressWarnings({"DuplicatedCode", "SpellCheckingInspection", "unchecked", "UnusedLabel", "unused"})
 public class SyntaxGenerator {
 
     protected final JavaPlugin plugin;
     protected final SkriptAddon addon;
+    @SuppressWarnings("CanBeFinal")
     protected RuntimeClassLoader loader = new RuntimeClassLoader(this.getClass().getClassLoader());
     protected volatile int index = 0;
     
     //region Test Only
+    /**
+     * For testing class generation in a non-minecraft environment.
+     */
     @Deprecated
     protected SyntaxGenerator() {
         plugin = null;
@@ -39,6 +53,15 @@ public class SyntaxGenerator {
     }
     //endregion
     
+    /**
+     * Creates a syntax generator with which your plugin can create load Skript syntax.
+     * Usage can be found at {@link #registerSyntaxFrom(Class[])}
+     *
+     * Once this instance is garbage collected it will destroy all created classes.
+     *
+     * @param plugin Your plugin instance
+     * @throws IllegalStateException If Skript is not present or otherwise non-functional
+     */
     public SyntaxGenerator(final JavaPlugin plugin)
         throws IllegalStateException {
         final Plugin skript = Bukkit.getPluginManager().getPlugin("Skript");
@@ -50,6 +73,14 @@ public class SyntaxGenerator {
     }
     
     //region Syntax Registration
+    /**
+     * Generates and registers syntax from all annotated members of the provided classes.
+     * Classes and members with no viable annotations will be ignored.
+     *
+     * For annotation description and use see the README.
+     *
+     * @param classes The classes to scour
+     */
     public void registerSyntaxFrom(final Class<?>... classes) {
         for (final Class<?> cls : classes) {
             registerSyntax(cls);
@@ -59,6 +90,21 @@ public class SyntaxGenerator {
     protected void registerSyntax(final Class<?> cls) {
         if (cls.isAnnotationPresent(SkriptType.class)) {
             registerType(cls);
+        }
+        if (cls.isAnnotationPresent(mx.kenzie.skriptlab.annotation.Event.class)) {
+            assert Event.class.isAssignableFrom(cls);
+            final mx.kenzie.skriptlab.annotation.Event event = cls.getAnnotation(mx.kenzie.skriptlab.annotation.Event.class);
+            final String[] syntax = (event.value().length < 1)
+                ? new String[]{CaseFormat.UPPER_CAMEL
+                .to(CaseFormat.LOWER_UNDERSCORE, event.annotationType().getSimpleName())
+                .replace("_", " ").replace(" event", "")}
+                : event.value();
+            final List<Method> values = new ArrayList<>();
+            for (final Method method : cls.getDeclaredMethods()) {
+                if (!method.isAnnotationPresent(EventValue.class)) continue;
+                values.add(method);
+            }
+            registerEvent((Class<? extends Event>) cls, values.toArray(new Method[0]), syntax);
         }
         for (final Method method : cls.getDeclaredMethods()) {
             if (!method.isAnnotationPresent(Effect.class)) continue;
@@ -131,6 +177,7 @@ public class SyntaxGenerator {
         }
     }
     
+    @SuppressWarnings("NullableProblems")
     protected <ObjectType>
     void registerType(Class<ObjectType> cls) {
         if (Classes.getExactClassInfo(cls) != null) return;
@@ -150,7 +197,7 @@ public class SyntaxGenerator {
             : "Unknown";
         String name = cls.isAnnotationPresent(Doc.Name.class)
             ? cls.getDeclaredAnnotation(Doc.Name.class).value()
-            : codename.toUpperCase().substring(0, 1) + codename.toLowerCase().substring(1);
+            : codename.toUpperCase().charAt(0) + codename.toLowerCase().substring(1);
         final String coded = codename;
         Classes.registerClass(new ClassInfo<>(cls, codename)
             .user(user)
@@ -174,7 +221,7 @@ public class SyntaxGenerator {
                                 try {
                                     reset.invoke(objectType);
                                 } catch (Throwable throwable) {
-                                    throwable.printStackTrace();;
+                                    throwable.printStackTrace();
                                 }
                             }
                         }
@@ -225,6 +272,7 @@ public class SyntaxGenerator {
         try {
             cls.getField("target").set(null, object);
             cls.getField("name").set(null, name);
+            cls.getField("syntax").set(null, name);
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new SyntaxLoadException("Unable to set method targets.", e);
         }
@@ -244,6 +292,7 @@ public class SyntaxGenerator {
         try {
             cls.getField("field").set(null, field);
             cls.getField("modes").set(null, modes);
+            cls.getField("syntax").set(null, name);
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new SyntaxLoadException("Unable to set field targets.", e);
         }
@@ -266,6 +315,7 @@ public class SyntaxGenerator {
         try {
             cls.getField("method").set(null, method);
             cls.getField("modes").set(null, modes);
+            cls.getField("syntax").set(null, syntax[0]);
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new SyntaxLoadException("Unable to set method targets.", e);
         }
@@ -278,14 +328,120 @@ public class SyntaxGenerator {
         assert cls != null;
         try {
             cls.getField("method").set(null, method);
+            cls.getField("syntax").set(null, syntax[0]);
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new SyntaxLoadException("Unable to set method targets.", e);
         }
         Skript.registerEffect(cls, syntax);
     }
+    
+    protected <EventType extends Event, Value>
+    void registerEvent(final Class<EventType> event, final Method[] values, final String... syntax) {
+        final Class<GeneratedEvent> cls = this.generateEventClass();
+        assert cls != null;
+        try {
+            cls.getField("event").set(null, event);
+            cls.getField("syntax").set(null, syntax[0]);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new SyntaxLoadException("Unable to set event class targets.", e);
+        }
+        Skript.registerEvent(event.getSimpleName(), cls, event, syntax);
+        for (Method value : values) {
+            try {
+                final Class<?> get = this.generateGetterClass(value);
+                final Getter<Value, EventType> getter = (Getter<Value, EventType>) get.newInstance();
+                EventValues.registerEventValue(event, (Class<Value>) value.getReturnType(), getter, 0);
+            } catch (InstantiationException | IllegalAccessException e) {
+                throw new SyntaxCreationException(e);
+            }
+        }
+    }
     //endregion
     
     //region Class Generation
+    protected synchronized <EventType extends Event, Value>
+    Class<? extends Getter<Value, EventType>> generateGetterClass(final Method binder)
+        throws SyntaxCreationException {
+        final Class<EventType> event = (Class<EventType>) binder.getDeclaringClass();
+        final Class<Value> value = (Class<Value>) binder.getReturnType();
+        final String namespace = "mx.kenzie.skriptlab.generated.$Getter" + this.hashCode() + "$" + (++index);
+        final String internalName = namespace.replace(".", "/");
+        final String superName = "ch/njol/skript/util/Getter";
+        final ClassWriter writer = new ClassWriter(ASM9 + ClassWriter.COMPUTE_MAXS);
+        writer.visit(V11, ACC_PUBLIC | ACC_SUPER,
+            internalName, "Lch/njol/skript/util/Getter<L" + this.internalName(value) + ";L" + this.internalName(event) + ";>;", superName,
+            null);
+        constructor: addEmptyLoadConstructor(writer, superName);
+        get_virtual: {
+            final MethodVisitor method = writer.visitMethod(ACC_PUBLIC, "get", "(L"+ this.internalName(event) +";)L" + this.internalName(value) + ";", null, null);
+            method.visitCode();
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(INVOKEVIRTUAL, this.internalName(event), binder.getName(), "()L" + this.internalName(value) +";", false);
+            method.visitInsn(ARETURN);
+            method.visitMaxs(1, 2);
+            method.visitEnd();
+        }
+        get_synthetic: {
+            final MethodVisitor method = writer.visitMethod(ACC_PUBLIC | ACC_BRIDGE | ACC_SYNTHETIC, "get", "(Ljava/lang/Object;)Ljava/lang/Object;", null, null);
+            method.visitCode();
+            method.visitVarInsn(ALOAD, 0);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitTypeInsn(CHECKCAST, this.internalName(event));
+            method.visitMethodInsn(INVOKEVIRTUAL, internalName, "get", "(L" + this.internalName(event) + ";)L" + this.internalName(value) +";", false);
+            method.visitInsn(ARETURN);
+            method.visitMaxs(2, 2);
+            method.visitEnd();
+        }
+        writer.visitEnd();
+        final byte[] bytecode = writer.toByteArray();
+        try {
+            final Class<?> cls = loadClass(namespace, bytecode);
+            return (Class<? extends Getter<Value, EventType>>) cls;
+        } catch (Throwable ex) {
+            throw new SyntaxCreationException(ex);
+        }
+    }
+    protected synchronized Class<GeneratedEvent> generateEventClass()
+        throws SyntaxCreationException {
+        final String namespace = "mx.kenzie.skriptlab.generated.$Event" + this.hashCode() + "$" + (++index);
+        final String internalName = namespace.replace(".", "/");
+        final String superName = "mx/kenzie/skriptlab/template/GeneratedEvent";
+        final ClassWriter writer = new ClassWriter(ASM9 + ClassWriter.COMPUTE_MAXS);
+        writer.visit(V11, ACC_PUBLIC | ACC_SUPER,
+            internalName, null, superName,
+            null);
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "syntax", "Ljava/lang/String;", null, null).visitEnd();
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "event", "Ljava/lang/Class;", "Ljava/lang/Class<+Lorg/bukkit/event/Event;>;", null).visitEnd();
+        constructor: addEmptyLoadConstructor(writer, superName);
+        check: {
+            final MethodVisitor method = writer.visitMethod(ACC_PUBLIC, "check", "(Lorg/bukkit/event/Event;)Z", null, null);
+            method.visitCode();
+            method.visitFieldInsn(GETSTATIC, internalName, "event", "Ljava/lang/Class;");
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Class", "isInstance", "(Ljava/lang/Object;)Z", false);
+            method.visitInsn(IRETURN);
+            method.visitMaxs(2, 2);
+            method.visitEnd();
+        }
+        event_class: {
+            final MethodVisitor method = writer.visitMethod(ACC_PROTECTED, "getEventClass", "()Ljava/lang/Class;", "()Ljava/lang/Class<+Lorg/bukkit/event/Event;>;", null);
+            method.visitCode();
+            method.visitFieldInsn(GETSTATIC, internalName, "event", "Ljava/lang/Class;");
+            method.visitInsn(ARETURN);
+            method.visitMaxs(1, 1);
+            method.visitEnd();
+        }
+        syntax: addSyntaxGetter(writer, internalName);
+        writer.visitEnd();
+        final byte[] bytecode = writer.toByteArray();
+        try {
+            final Class<?> cls = loadClass(namespace, bytecode);
+            return (Class<GeneratedEvent>) cls;
+        } catch (Throwable ex) {
+            throw new SyntaxCreationException(ex);
+        }
+    }
+    
     protected synchronized Class<GeneratedEffect> generateEffectClass()
         throws SyntaxCreationException {
         final String namespace = "mx.kenzie.skriptlab.generated.$Effect" + this.hashCode() + "$" + (++index);
@@ -295,17 +451,10 @@ public class SyntaxGenerator {
         writer.visit(V11, ACC_PUBLIC | ACC_SUPER,
             internalName, null, superName,
             null);
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "syntax", "Ljava/lang/String;", null, null).visitEnd();
         writer.visitField(ACC_PUBLIC | ACC_STATIC, "method", "Ljava/lang/reflect/Method;", null, null).visitEnd();
         writer.visitField(ACC_PUBLIC | ACC_STATIC, "caller", "Ljava/lang/Object;", null, null).visitEnd();
-        constructor: {
-            final MethodVisitor method = writer.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
-            method.visitCode();
-            method.visitVarInsn(ALOAD, 0);
-            method.visitMethodInsn(INVOKESPECIAL, superName, "<init>", "()V", false);
-            method.visitInsn(RETURN);
-            method.visitMaxs(1, 1);
-            method.visitEnd();
-        }
+        constructor: addEmptyLoadConstructor(writer, superName);
         execute: {
             final MethodVisitor method = writer.visitMethod(ACC_PROTECTED, "execute", "(Lorg/bukkit/event/Event;)V", null, null);
             method.visitCode();
@@ -318,13 +467,14 @@ public class SyntaxGenerator {
             method.visitMaxs(4, 2);
             method.visitEnd();
         }
+        syntax: addSyntaxGetter(writer, internalName);
         writer.visitEnd();
         final byte[] bytecode = writer.toByteArray();
         try {
             final Class<?> cls = loadClass(namespace, bytecode);
             return (Class<GeneratedEffect>) cls;
         } catch (Throwable ex) {
-            throw new SyntaxLoadException(ex);
+            throw new SyntaxCreationException(ex);
         }
     }
     
@@ -337,17 +487,10 @@ public class SyntaxGenerator {
         writer.visit(V11, ACC_PUBLIC | ACC_SUPER,
             internalName, null, superName,
             null);
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "syntax", "Ljava/lang/String;", null, null).visitEnd();
         writer.visitField(ACC_PUBLIC | ACC_STATIC, "target", "Ljava/lang/Object;", null, null).visitEnd();
         writer.visitField(ACC_PUBLIC | ACC_STATIC, "name", "Ljava/lang/String;", null, null).visitEnd();
-        constructor: {
-            final MethodVisitor constructor = writer.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
-            constructor.visitCode();
-            constructor.visitVarInsn(ALOAD, 0);
-            constructor.visitMethodInsn(INVOKESPECIAL, "mx/kenzie/skriptlab/template/GeneratedPropertyCondition", "<init>", "()V", false);
-            constructor.visitInsn(RETURN);
-            constructor.visitMaxs(1, 1);
-            constructor.visitEnd();
-        }
+        constructor: addEmptyLoadConstructor(writer, superName);
         check: {
             final MethodVisitor method = writer.visitMethod(ACC_PUBLIC, "check", "(Ljava/lang/Object;)Z", "(TT;)Z", null);
             method.visitCode();
@@ -367,13 +510,14 @@ public class SyntaxGenerator {
             methodVisitor.visitMaxs(1, 1);
             methodVisitor.visitEnd();
         }
+        syntax: addSyntaxGetter(writer, internalName);
         writer.visitEnd();
         final byte[] bytecode = writer.toByteArray();
         try {
             final Class<?> cls = loadClass(namespace, bytecode);
             return (Class<GeneratedPropertyCondition<?>>) cls;
         } catch (Throwable ex) {
-            throw new SyntaxLoadException(ex);
+            throw new SyntaxCreationException(ex);
         }
     }
     
@@ -387,17 +531,10 @@ public class SyntaxGenerator {
         writer.visit(V11, ACC_PUBLIC | ACC_SUPER,
             internalName, null, superName,
             null);
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "syntax", "Ljava/lang/String;", null, null).visitEnd();
         writer.visitField(ACC_PUBLIC | ACC_STATIC, "field", "Ljava/lang/reflect/Field;", null, null).visitEnd();
         writer.visitField(ACC_PUBLIC | ACC_STATIC, "modes", "[Lch/njol/skript/classes/Changer$ChangeMode;", null, null).visitEnd();
-        constructor: {
-            final MethodVisitor constructor = writer.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
-            constructor.visitCode();
-            constructor.visitVarInsn(ALOAD, 0);
-            constructor.visitMethodInsn(INVOKESPECIAL, "mx/kenzie/skriptlab/template/GeneratedPropertyExpression", "<init>", "()V", false);
-            constructor.visitInsn(RETURN);
-            constructor.visitMaxs(1, 1);
-            constructor.visitEnd();
-        }
+        constructor: addEmptyLoadConstructor(writer, superName);
         get: {
             final MethodVisitor method = writer.visitMethod(ACC_PROTECTED, "get", "(Lorg/bukkit/event/Event;)[Ljava/lang/Object;", "(Lorg/bukkit/event/Event;)[TT;", null);
             method.visitCode();
@@ -465,13 +602,14 @@ public class SyntaxGenerator {
             method.visitMaxs(2, 1);
             method.visitEnd();
         }
+        syntax: addSyntaxGetter(writer, internalName);
         writer.visitEnd();
         final byte[] bytecode = writer.toByteArray();
         try {
             final Class<?> cls = loadClass(namespace, bytecode);
             return (Class<GeneratedPropertyExpression<Expr>>) cls;
         } catch (Throwable ex) {
-            throw new SyntaxLoadException(ex);
+            throw new SyntaxCreationException(ex);
         }
     }
     
@@ -485,17 +623,10 @@ public class SyntaxGenerator {
         writer.visit(V11, ACC_PUBLIC | ACC_SUPER,
             internalName, null, superName,
             null);
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "syntax", "Ljava/lang/String;", null, null).visitEnd();
         writer.visitField(ACC_PUBLIC | ACC_STATIC, "method", "Ljava/lang/reflect/Method;", null, null).visitEnd();
         writer.visitField(ACC_PUBLIC | ACC_STATIC, "modes", "[Lch/njol/skript/classes/Changer$ChangeMode;", null, null).visitEnd();
-        constructor: {
-            final MethodVisitor constructor = writer.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
-            constructor.visitCode();
-            constructor.visitVarInsn(ALOAD, 0);
-            constructor.visitMethodInsn(INVOKESPECIAL, superName, "<init>", "()V", false);
-            constructor.visitInsn(RETURN);
-            constructor.visitMaxs(1, 1);
-            constructor.visitEnd();
-        }
+        constructor: addEmptyLoadConstructor(writer, superName);
         get: {
             final MethodVisitor method = writer.visitMethod(ACC_PROTECTED, "get", "(Lorg/bukkit/event/Event;)[Ljava/lang/Object;", "(Lorg/bukkit/event/Event;)[TT;", null);
             method.visitCode();
@@ -564,14 +695,34 @@ public class SyntaxGenerator {
             method.visitMaxs(2, 1);
             method.visitEnd();
         }
+        syntax: addSyntaxGetter(writer, internalName);
         writer.visitEnd();
         final byte[] bytecode = writer.toByteArray();
         try {
             final Class<?> cls = loadClass(namespace, bytecode);
             return (Class<GeneratedSimpleExpression<Expr>>) cls;
         } catch (Throwable ex) {
-            throw new SyntaxLoadException(ex);
+            throw new SyntaxCreationException(ex);
         }
+    }
+    
+    protected void addEmptyLoadConstructor(ClassWriter writer, String superName) {
+        final MethodVisitor constructor = writer.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
+        constructor.visitCode();
+        constructor.visitVarInsn(ALOAD, 0);
+        constructor.visitMethodInsn(INVOKESPECIAL, superName, "<init>", "()V", false);
+        constructor.visitInsn(RETURN);
+        constructor.visitMaxs(1, 1);
+        constructor.visitEnd();
+    }
+    
+    protected void addSyntaxGetter(ClassWriter writer, String internalName) {
+        final MethodVisitor method = writer.visitMethod(ACC_PUBLIC, "getSyntax", "()Ljava/lang/String;", null, null);
+        method.visitCode();
+        method.visitFieldInsn(GETSTATIC, internalName, "syntax", "Ljava/lang/String;");
+        method.visitInsn(ARETURN);
+        method.visitMaxs(1, 1);
+        method.visitEnd();
     }
     //endregion
     
@@ -590,6 +741,10 @@ public class SyntaxGenerator {
         } catch (Throwable throwable) {
             return null; // We don't want to know if there is no method
         }
+    }
+    
+    protected String internalName(Class<?> cls) {
+        return cls.getName().replace(".", "/");
     }
     //endregion
     

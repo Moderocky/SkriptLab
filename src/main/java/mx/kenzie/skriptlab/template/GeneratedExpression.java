@@ -3,11 +3,12 @@ package mx.kenzie.skriptlab.template;
 import ch.njol.skript.classes.Changer;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.util.SimpleExpression;
+import org.bukkit.event.Event;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
-public abstract class GeneratedExpression<T> extends SimpleExpression<T> implements Expression<T> {
+public abstract class GeneratedExpression<T> extends SimpleExpression<T> implements Expression<T>, GeneratedMember {
     
     public static Class<?> ensureWrapper(Class<?> cls) {
         if (cls == int.class
@@ -35,4 +36,8 @@ public abstract class GeneratedExpression<T> extends SimpleExpression<T> impleme
         };
     }
     
+    @Override
+    public String toString(Event e, boolean debug) {
+        return this.getSyntax(); // TODO: Create a toString implementation
+    }
 }
