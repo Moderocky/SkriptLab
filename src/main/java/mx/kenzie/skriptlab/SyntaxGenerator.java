@@ -88,10 +88,10 @@ public class SyntaxGenerator {
     }
     
     protected void registerSyntax(final Class<?> cls) {
-        if (cls.isAnnotationPresent(SkriptType.class)) {
+        type: if (cls.isAnnotationPresent(SkriptType.class)) {
             registerType(cls);
         }
-        if (cls.isAnnotationPresent(mx.kenzie.skriptlab.annotation.Event.class)) {
+        event: if (cls.isAnnotationPresent(mx.kenzie.skriptlab.annotation.Event.class)) {
             assert Event.class.isAssignableFrom(cls);
             final mx.kenzie.skriptlab.annotation.Event event = cls.getAnnotation(mx.kenzie.skriptlab.annotation.Event.class);
             final String[] syntax = (event.value().length < 1)
@@ -106,7 +106,7 @@ public class SyntaxGenerator {
             }
             registerEvent((Class<? extends Event>) cls, values.toArray(new Method[0]), syntax);
         }
-        for (final Method method : cls.getDeclaredMethods()) {
+        effect: for (final Method method : cls.getDeclaredMethods()) {
             if (!method.isAnnotationPresent(Effect.class)) continue;
             method.setAccessible(true);
             final Effect effect = method.getAnnotation(Effect.class);
@@ -116,7 +116,7 @@ public class SyntaxGenerator {
                 : effect.value();
             registerEffect(method, syntax);
         }
-        for (final Method method : cls.getDeclaredMethods()) {
+        condition_method: for (final Method method : cls.getDeclaredMethods()) {
             if (!method.isAnnotationPresent(Condition.class)) continue;
             method.setAccessible(true);
             final Condition condition = method.getAnnotation(Condition.class);
@@ -135,7 +135,7 @@ public class SyntaxGenerator {
                 ? PropertyCondition.PropertyType.HAVE
                 : PropertyCondition.PropertyType.BE);
         }
-        for (final Field field : cls.getDeclaredFields()) {
+        condition_field: for (final Field field : cls.getDeclaredFields()) {
             if (!field.isAnnotationPresent(Condition.class)) continue;
             field.setAccessible(true);
             final String name = field.getName();
@@ -153,7 +153,7 @@ public class SyntaxGenerator {
                 ? PropertyCondition.PropertyType.HAVE
                 : PropertyCondition.PropertyType.BE);
         }
-        for (final Field field : cls.getDeclaredFields()) {
+        property_expression: for (final Field field : cls.getDeclaredFields()) {
             if (!field.isAnnotationPresent(Property.class)) continue;
             field.setAccessible(true);
             final String name = field.getName();
@@ -164,7 +164,7 @@ public class SyntaxGenerator {
                 : property.value();
             registerPropertyExpression(field, syntax);
         }
-        for (final Method method : cls.getDeclaredMethods()) {
+        simple_expression: for (final Method method : cls.getDeclaredMethods()) {
             if (!method.isAnnotationPresent(Expression.class)) continue;
             method.setAccessible(true);
             final String name = method.getName();
