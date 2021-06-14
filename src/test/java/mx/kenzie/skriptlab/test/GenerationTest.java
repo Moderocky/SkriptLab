@@ -16,10 +16,10 @@ public class GenerationTest {
     public void sample() throws Throwable {
         new SyntaxGenerator() {
             @Override
-            public synchronized Class<GeneratedEffect> generateEffectClass() throws SyntaxCreationException {
-                return super.generateEffectClass();
+            protected synchronized Class<GeneratedEffect> generateEffectClass(Method binder) throws SyntaxCreationException {
+                return super.generateEffectClass(binder);
             }
-        }.generateEffectClass();
+        }.generateEffectClass(GenerationTest.class.getDeclaredMethod("blob"));
         new SyntaxGenerator() {
             @Override
             protected synchronized Class<GeneratedPropertyCondition<?>> generatePropertyConditionClass() throws SyntaxCreationException {

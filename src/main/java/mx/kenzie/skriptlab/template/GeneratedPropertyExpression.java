@@ -11,7 +11,7 @@ import java.lang.reflect.Field;
 import java.util.*;
 
 public abstract class GeneratedPropertyExpression<T> extends GeneratedExpression<T> {
-    private final Set<Expression<?>> expressions = new HashSet<>();
+    protected final List<Expression<?>> expressions = new ArrayList<>();
     
     @Override
     public boolean init(Expression<?> [] exprs, int matchedPattern, Kleenean isDelayed, SkriptParser.ParseResult parseResult) {
@@ -114,5 +114,14 @@ public abstract class GeneratedPropertyExpression<T> extends GeneratedExpression
             inputs.add(expression.getSingle(event));
         }
         return String.format(this.getSyntax().replaceAll("%.+?%", "%s"), inputs.toArray());
+    }
+    
+    @Override
+    public List<Object> getConvertedExpressions(Event event) {
+        final List<Object> objects = new ArrayList<>();
+        for (Expression<?> expression : expressions) {
+            objects.add(expression.isSingle() ? expression.getSingle(event) : expression.getArray(event));
+        }
+        return objects;
     }
 }

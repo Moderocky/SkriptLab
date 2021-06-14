@@ -21,7 +21,10 @@ import org.bukkit.Bukkit;
 import org.bukkit.event.Event;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.objectweb.asm.*;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
 
 import java.lang.reflect.*;
 import java.util.ArrayList;
@@ -183,25 +186,24 @@ public class SyntaxGenerator {
         if (Classes.getExactClassInfo(cls) != null) return;
         if (!cls.isAnnotationPresent(SkriptType.class)) return;
         SkriptType type = cls.getDeclaredAnnotation(SkriptType.class);
-        String codename = type.value().isEmpty()
-            ? cls.getName().toLowerCase()
-            : type.value();
         final Documentation documentation = cls.isAnnotationPresent(Documentation.class)
             ? cls.getDeclaredAnnotation(Documentation.class)
             : null;
-        String[] user = documentation != null
+        final String codename = type.value().isEmpty()
+            ? cls.getName().toLowerCase()
+            : type.value();
+        final String[] user = documentation != null
             ? documentation.user()
             : new String[]{codename};
-        String[] description = documentation != null
+        final String[] description = documentation != null
             ? documentation.description()
             : new String[]{"Description missing."};
-        String since = documentation != null
+        final String since = documentation != null
             ? documentation.since()
             : "Unknown";
-        String name = documentation != null
+        final String name = documentation != null
             ? documentation.name()
             : codename.toUpperCase().charAt(0) + codename.toLowerCase().substring(1);
-        final String coded = codename;
         Classes.registerClass(new ClassInfo<>(cls, codename)
             .user(user)
             .name(name)
@@ -214,7 +216,6 @@ public class SyntaxGenerator {
                         return CollectionUtils.array();
                     return null;
                 }
-                
                 @Override
                 public void change(ObjectType[] what, Object[] delta, ChangeMode mode) {
                     final Method reset = getResetMethod(cls);
@@ -257,7 +258,7 @@ public class SyntaxGenerator {
                 
                 @Override
                 public String toVariableNameString(ObjectType o) {
-                    return coded;
+                    return codename;
                 }
                 
                 @Override
@@ -270,7 +271,13 @@ public class SyntaxGenerator {
     
     protected <ClassMember extends AccessibleObject & AnnotatedElement & Member>
     void registerPropertyCondition(final ClassMember object, final String name, final PropertyCondition.PropertyType type) {
-        final Class<GeneratedPropertyCondition<?>> cls = this.generatePropertyConditionClass();
+        final Class<GeneratedPropertyCondition<?>> cls;
+        if (((object instanceof Field field && field.getType() == boolean.class)
+            || (object instanceof Method method && method.getReturnType() == boolean.class))
+            && !Modifier.isStatic(object.getModifiers())
+            && Modifier.isPublic(object.getModifiers())
+        ) cls = this.generatePropertyConditionClass(object); // non-reflective version for dynamics with primitive types
+        else cls = this.generatePropertyConditionClass(); // reflective version for cooky and strange versions
         assert cls != null;
         try {
             cls.getField("target").set(null, object);
@@ -279,7 +286,7 @@ public class SyntaxGenerator {
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new SyntaxLoadException("Unable to set method targets.", e);
         }
-        ClassInfo<?> info = Classes.getExactClassInfo(object.getDeclaringClass());
+        final ClassInfo<?> info = Classes.getExactClassInfo(object.getDeclaringClass());
         assert info != null;
         PropertyCondition.register(cls, type, name, info.getCodeName());
     }
@@ -327,7 +334,7 @@ public class SyntaxGenerator {
     }
     
     protected void registerEffect(final Method method, final String... syntax) {
-        final Class<GeneratedEffect> cls = this.generateEffectClass();
+        final Class<GeneratedEffect> cls = this.generateEffectClass(method);
         assert cls != null;
         try {
             cls.getField("method").set(null, method);
@@ -372,14 +379,18 @@ public class SyntaxGenerator {
         final String superName = "ch/njol/skript/util/Getter";
         final ClassWriter writer = new ClassWriter(ASM9 + ClassWriter.COMPUTE_MAXS);
         writer.visit(V11, ACC_PUBLIC | ACC_SUPER,
-            internalName, "Lch/njol/skript/util/Getter<L" + this.internalName(value) + ";L" + this.internalName(event) + ";>;", superName,
-            null);
+            internalName, "Lch/njol/skript/util/Getter<" + value.descriptorString() + event
+                .descriptorString() + ">;", superName,
+            null); // this handles illegal primitive overloading
         constructor: addEmptyLoadConstructor(writer, superName);
         get_virtual: {
-            final MethodVisitor method = writer.visitMethod(ACC_PUBLIC, "get", "(L"+ this.internalName(event) +";)L" + this.internalName(value) + ";", null, null);
+            final MethodVisitor method = writer
+                .visitMethod(ACC_PUBLIC, "get", "(" + event.descriptorString() + ")" + value
+                    .descriptorString(), null, null);
             method.visitCode();
             method.visitVarInsn(ALOAD, 1);
-            method.visitMethodInsn(INVOKEVIRTUAL, this.internalName(event), binder.getName(), "()L" + this.internalName(value) +";", false);
+            method.visitMethodInsn(INVOKEVIRTUAL, this.internalName(event), binder.getName(), "()" + value
+                .descriptorString(), false);
             method.visitInsn(ARETURN);
             method.visitMaxs(1, 2);
             method.visitEnd();
@@ -390,7 +401,8 @@ public class SyntaxGenerator {
             method.visitVarInsn(ALOAD, 0);
             method.visitVarInsn(ALOAD, 1);
             method.visitTypeInsn(CHECKCAST, this.internalName(event));
-            method.visitMethodInsn(INVOKEVIRTUAL, internalName, "get", "(L" + this.internalName(event) + ";)L" + this.internalName(value) +";", false);
+            method.visitMethodInsn(INVOKEVIRTUAL, internalName, "get", "(" + event.descriptorString() + ")" + value
+                .descriptorString(), false);
             method.visitInsn(ARETURN);
             method.visitMaxs(2, 2);
             method.visitEnd();
@@ -404,6 +416,7 @@ public class SyntaxGenerator {
             throw new SyntaxCreationException(ex);
         }
     }
+    
     protected synchronized Class<GeneratedEvent> generateEventClass()
         throws SyntaxCreationException {
         final String namespace = "mx.kenzie.skriptlab.generated.$Event" + this.hashCode() + "$" + (++index);
@@ -445,7 +458,7 @@ public class SyntaxGenerator {
         }
     }
     
-    protected synchronized Class<GeneratedEffect> generateEffectClass()
+    protected synchronized Class<GeneratedEffect> generateEffectClass(final Method binder)
         throws SyntaxCreationException {
         final String namespace = "mx.kenzie.skriptlab.generated.$Effect" + this.hashCode() + "$" + (++index);
         final String internalName = namespace.replace(".", "/");
@@ -459,15 +472,67 @@ public class SyntaxGenerator {
         writer.visitField(ACC_PUBLIC | ACC_STATIC, "caller", "Ljava/lang/Object;", null, null).visitEnd();
         constructor: addEmptyLoadConstructor(writer, superName);
         execute: {
-            final MethodVisitor method = writer.visitMethod(ACC_PROTECTED, "execute", "(Lorg/bukkit/event/Event;)V", null, null);
+            final MethodVisitor method = writer
+                .visitMethod(ACC_PROTECTED, "execute", "(Lorg/bukkit/event/Event;)V", null, null);
             method.visitCode();
-            method.visitVarInsn(ALOAD, 0);
-            method.visitVarInsn(ALOAD, 1);
-            method.visitFieldInsn(GETSTATIC, internalName, "method", "Ljava/lang/reflect/Method;");
-            method.visitFieldInsn(GETSTATIC, internalName, "caller", "Ljava/lang/Object;");
-            method.visitMethodInsn(INVOKESPECIAL, superName, "execute", "(Lorg/bukkit/event/Event;Ljava/lang/reflect/Method;Ljava/lang/Object;)V", false);
-            method.visitInsn(RETURN);
-            method.visitMaxs(4, 2);
+            if (this.isSimple(binder)) { // public static no-parameters
+                method.visitMethodInsn(INVOKESTATIC, this.internalName(binder.getDeclaringClass()), binder
+                    .getName(), "()" + binder.getReturnType().descriptorString(), false);
+                method.visitInsn(RETURN);
+                method.visitMaxs(1, 1);
+            } else if (isSimpleDynamic(binder)) { // public dynamic no-parameters
+                method.visitVarInsn(ALOAD, 0);
+                method.visitVarInsn(ALOAD, 1);
+                method
+                    .visitMethodInsn(INVOKEVIRTUAL, internalName, "getConvertedExpressions", "(Lorg/bukkit/event/Event;)Ljava/util/List;", false);
+                method.visitInsn(ICONST_0);
+                method.visitMethodInsn(INVOKEINTERFACE, "java/util/List", "remove", "(I)Ljava/lang/Object;", true);
+                method.visitTypeInsn(CHECKCAST, this.internalName(binder.getDeclaringClass())); // get object target
+                method.visitMethodInsn(INVOKEVIRTUAL, this.internalName(binder.getDeclaringClass()), binder
+                    .getName(), "()" + binder.getReturnType().descriptorString(), false);
+                method.visitInsn(RETURN);
+                method.visitMaxs(2, 2);
+            } else if (binder.getParameterTypes().length > 0
+                && Modifier.isPublic(binder.getModifiers())) { // public and parameters
+                final boolean dynamic = !Modifier.isStatic(binder.getModifiers());
+                method.visitVarInsn(ALOAD, 0);
+                method.visitVarInsn(ALOAD, 1);
+                method.visitMethodInsn(INVOKEVIRTUAL, internalName, "getConvertedExpressions", "(Lorg/bukkit/event/Event;)Ljava/util/List;", false);
+                method.visitVarInsn(ASTORE, 2);
+                if (dynamic) { // Trough the first input as the object
+                    method.visitVarInsn(ALOAD, 2);
+                    method.visitInsn(ICONST_0);
+                    method.visitMethodInsn(INVOKEINTERFACE, "java/util/List", "remove", "(I)Ljava/lang/Object;", true);
+                    method.visitTypeInsn(CHECKCAST, this.internalName(binder.getDeclaringClass()));
+                }
+                final StringBuilder builder = new StringBuilder("(");
+                for (Class<?> type : binder.getParameterTypes()) {
+                    method.visitVarInsn(ALOAD, 2);
+                    method.visitInsn(ICONST_0);
+                    method.visitMethodInsn(INVOKEINTERFACE, "java/util/List", "remove", "(I)Ljava/lang/Object;", true);
+                    method.visitTypeInsn(CHECKCAST, this.internalName(type));
+                    builder.append(type.descriptorString());
+                }
+                builder.append(")").append(binder.getReturnType().descriptorString());
+                if (dynamic) {
+                    method.visitMethodInsn(INVOKEVIRTUAL, this.internalName(binder.getDeclaringClass()), binder
+                        .getName(), builder.toString(), false);
+                } else {
+                    method.visitMethodInsn(INVOKESTATIC, this.internalName(binder.getDeclaringClass()), binder
+                        .getName(), builder.toString(), false);
+                }
+                method.visitInsn(RETURN);
+                method.visitMaxs(3 + binder.getParameterTypes().length, 3);
+            } else { // Can't deal with unknown parameter types, cede to reflective case
+                method.visitVarInsn(ALOAD, 0);
+                method.visitVarInsn(ALOAD, 1);
+                method.visitFieldInsn(GETSTATIC, internalName, "method", "Ljava/lang/reflect/Method;");
+                method.visitFieldInsn(GETSTATIC, internalName, "caller", "Ljava/lang/Object;");
+                method
+                    .visitMethodInsn(INVOKESPECIAL, superName, "execute", "(Lorg/bukkit/event/Event;Ljava/lang/reflect/Method;Ljava/lang/Object;)V", false);
+                method.visitInsn(RETURN);
+                method.visitMaxs(4, 2);
+            }
             method.visitEnd();
         }
         syntax: addSyntaxGetter(writer, internalName);
@@ -476,6 +541,60 @@ public class SyntaxGenerator {
         try {
             final Class<?> cls = loadClass(namespace, bytecode);
             return (Class<GeneratedEffect>) cls;
+        } catch (Throwable ex) {
+            throw new SyntaxCreationException(ex);
+        }
+    }
+    
+    protected synchronized Class<GeneratedPropertyCondition<?>> generatePropertyConditionClass(Object target)
+        throws SyntaxCreationException {
+        final String namespace = "mx.kenzie.skriptlab.generated.$PropertyCondition" + this.hashCode() + "$" + (++index);
+        final String internalName = namespace.replace(".", "/");
+        final String superName = "mx/kenzie/skriptlab/template/GeneratedPropertyCondition";
+        final ClassWriter writer = new ClassWriter(ASM9 + ClassWriter.COMPUTE_MAXS);
+        writer.visit(V11, ACC_PUBLIC | ACC_SUPER,
+            internalName, null, superName,
+            null);
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "syntax", "Ljava/lang/String;", null, null).visitEnd();
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "target", "Ljava/lang/Object;", null, null).visitEnd();
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "name", "Ljava/lang/String;", null, null).visitEnd();
+        constructor: addEmptyLoadConstructor(writer, superName);
+        check_field: {
+            if (!(target instanceof Field binder)) break check_field;
+            final MethodVisitor method = writer.visitMethod(ACC_PUBLIC, "check", "(Ljava/lang/Object;)Z", "(TT;)Z", null);
+            method.visitCode();
+            method.visitVarInsn(ALOAD, 1);
+            method.visitTypeInsn(CHECKCAST, this.internalName(binder.getDeclaringClass()));
+            method.visitFieldInsn(GETFIELD, this.internalName(binder.getDeclaringClass()), binder.getName(), "Z");
+            method.visitInsn(IRETURN);
+            method.visitMaxs(1, 2);
+            method.visitEnd();
+        }
+        check_method: {
+            if (!(target instanceof Method binder)) break check_method;
+            final MethodVisitor method = writer.visitMethod(ACC_PUBLIC, "check", "(Ljava/lang/Object;)Z", "(TT;)Z", null);
+            method.visitCode();
+            method.visitVarInsn(ALOAD, 1);
+            method.visitTypeInsn(CHECKCAST, this.internalName(binder.getDeclaringClass()));
+            method.visitMethodInsn(INVOKEVIRTUAL, this.internalName(binder.getDeclaringClass()), binder.getName(), "()Z", false);
+            method.visitInsn(IRETURN);
+            method.visitMaxs(1, 2);
+            method.visitEnd();
+        }
+        name: {
+            final MethodVisitor methodVisitor = writer.visitMethod(ACC_PROTECTED, "getPropertyName", "()Ljava/lang/String;", null, null);
+            methodVisitor.visitCode();
+            methodVisitor.visitFieldInsn(GETSTATIC, internalName, "name", "Ljava/lang/String;");
+            methodVisitor.visitInsn(ARETURN);
+            methodVisitor.visitMaxs(1, 1);
+            methodVisitor.visitEnd();
+        }
+        syntax: addSyntaxGetter(writer, internalName);
+        writer.visitEnd();
+        final byte[] bytecode = writer.toByteArray();
+        try {
+            final Class<?> cls = loadClass(namespace, bytecode);
+            return (Class<GeneratedPropertyCondition<?>>) cls;
         } catch (Throwable ex) {
             throw new SyntaxCreationException(ex);
         }
@@ -749,6 +868,17 @@ public class SyntaxGenerator {
     protected String internalName(Class<?> cls) {
         return cls.getName().replace(".", "/");
     }
+    
+    protected boolean isSimple(Method method) {
+        return method.getParameterTypes().length < 1
+            && Modifier.isStatic(method.getModifiers())
+            && Modifier.isPublic(method.getModifiers());
+    }
+    
+    protected boolean isSimpleDynamic(Method method) {
+        return method.getParameterTypes().length < 1
+            && Modifier.isPublic(method.getModifiers());
+    }
     //endregion
     
     //region Class Loader
@@ -757,7 +887,7 @@ public class SyntaxGenerator {
     }
     
     static class RuntimeClassLoader extends ClassLoader {
-    
+        
         protected RuntimeClassLoader(ClassLoader parent) {
             super(parent);
         }

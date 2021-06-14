@@ -11,7 +11,7 @@ import java.lang.reflect.Modifier;
 import java.util.*;
 
 public abstract class GeneratedEffect extends Effect implements GeneratedMember {
-    private final Set<Expression<?>> expressions = new HashSet<>();
+    protected final List<Expression<?>> expressions = new ArrayList<>();
     
     //region Overridden Stubs
     @Override
@@ -49,5 +49,14 @@ public abstract class GeneratedEffect extends Effect implements GeneratedMember 
     public boolean init(Expression<?>[] expressions, int i, Kleenean kleenean, SkriptParser.ParseResult parseResult) {
         this.expressions.addAll(Arrays.asList(expressions));
         return true;
+    }
+    
+    @Override
+    public List<Object> getConvertedExpressions(Event event) {
+        final List<Object> objects = new ArrayList<>();
+        for (Expression<?> expression : expressions) {
+            objects.add(expression.isSingle() ? expression.getSingle(event) : expression.getArray(event));
+        }
+        return objects;
     }
 }
