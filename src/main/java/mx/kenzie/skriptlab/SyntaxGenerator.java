@@ -186,17 +186,20 @@ public class SyntaxGenerator {
         String codename = type.value().isEmpty()
             ? cls.getName().toLowerCase()
             : type.value();
-        String[] user = cls.isAnnotationPresent(Doc.User.class)
-            ? cls.getDeclaredAnnotation(Doc.User.class).value()
+        final Documentation documentation = cls.isAnnotationPresent(Documentation.class)
+            ? cls.getDeclaredAnnotation(Documentation.class)
+            : null;
+        String[] user = documentation != null
+            ? documentation.user()
             : new String[]{codename};
-        String[] description = cls.isAnnotationPresent(Doc.Description.class)
-            ? cls.getDeclaredAnnotation(Doc.Description.class).value()
+        String[] description = documentation != null
+            ? documentation.description()
             : new String[]{"Description missing."};
-        String since = cls.isAnnotationPresent(Doc.Since.class)
-            ? cls.getDeclaredAnnotation(Doc.Since.class).value()
+        String since = documentation != null
+            ? documentation.since()
             : "Unknown";
-        String name = cls.isAnnotationPresent(Doc.Name.class)
-            ? cls.getDeclaredAnnotation(Doc.Name.class).value()
+        String name = documentation != null
+            ? documentation.name()
             : codename.toUpperCase().charAt(0) + codename.toLowerCase().substring(1);
         final String coded = codename;
         Classes.registerClass(new ClassInfo<>(cls, codename)

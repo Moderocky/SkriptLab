@@ -49,7 +49,7 @@ SkriptLab is accessed through a series of five basic annotations.
 |Property|Field (any)|An expression of the type `the X of Y` or `Y's X` where X is the property name and Y is the object. This may be used only on dynamic fields. Primitives and number types are automatically wrapped.|
 |SkriptType|Class|Registers the given object class as a Skript Type, allowing it to be used in syntax.|
 
-The `Doc` annotation and its nested children can be used in conjunction with `SkriptType` to provide extra details for Skript's automatic user documentation generation. This is not necessary, and the type alone is all that is required for simple registration. 
+The `Documentation` annotation can be used in conjunction with `SkriptType` to provide extra details for Skript's automatic user documentation generation. This is not necessary, and the type alone is all that is required for simple registration. 
 
 These annotations are designed to be unobtrusive and easy to add into a plugin's existing code without requiring any changes or extra classes to be created.
 
