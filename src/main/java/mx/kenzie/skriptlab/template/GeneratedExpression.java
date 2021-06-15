@@ -5,6 +5,7 @@ import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.util.SimpleExpression;
 import org.bukkit.event.Event;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
@@ -21,6 +22,21 @@ public abstract class GeneratedExpression<T> extends SimpleExpression<T> impleme
         if (cls == boolean.class
         ) return Boolean.class;
         return cls;
+    }
+    
+    protected T[] wrapArray(Object object) {
+        if (object == null) return null;
+        else if (object.getClass().isArray()) {
+            if (object.getClass().getComponentType().isPrimitive()) {
+                T[] array = (T[]) Array.newInstance(ensureWrapper(getReturnType()), Array.getLength(object));
+                System.arraycopy(object, 0, array, 0, array.length);
+                return array;
+            } else return (T[]) object;
+        } else {
+            final T[] array = (T[]) Array.newInstance(ensureWrapper(getReturnType()), 1);
+            array[0] = (T) object;
+            return array;
+        }
     }
     
     public Class<?>[] getChangeType(Field field) {

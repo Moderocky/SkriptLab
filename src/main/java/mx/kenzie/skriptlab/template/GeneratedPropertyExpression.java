@@ -8,7 +8,10 @@ import org.bukkit.event.Event;
 import org.eclipse.jdt.annotation.Nullable;
 
 import java.lang.reflect.Field;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
 
 public abstract class GeneratedPropertyExpression<T> extends GeneratedExpression<T> {
     protected final List<Expression<?>> expressions = new ArrayList<>();
@@ -41,12 +44,10 @@ public abstract class GeneratedPropertyExpression<T> extends GeneratedExpression
     }
     //endregion
     
-    @SuppressWarnings("unchecked")
     protected T[] get(Event event, Field field) {
         if (expressions.size() < 1) return null;
         try {
-            List<T> list = Collections.singletonList((T) field.get(expressions.iterator().next().getSingle(event)));
-            return (T[]) list.toArray();
+            return wrapArray(field.get(expressions.iterator().next().getSingle(event)));
         } catch (Throwable throwable) {
             throwable.printStackTrace();
             return null;

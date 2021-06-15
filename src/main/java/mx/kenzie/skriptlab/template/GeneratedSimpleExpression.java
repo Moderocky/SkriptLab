@@ -7,10 +7,11 @@ import ch.njol.util.Kleenean;
 import org.bukkit.event.Event;
 import org.eclipse.jdt.annotation.Nullable;
 
-import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public abstract class GeneratedSimpleExpression<T> extends GeneratedExpression<T> {
     protected final List<Expression<?>> expressions = new ArrayList<>();
@@ -54,7 +55,7 @@ public abstract class GeneratedSimpleExpression<T> extends GeneratedExpression<T
             if (Modifier.isStatic(method.getModifiers()))
                 target = null;
             else target = objects.remove(0);
-            return Collections.singletonList(method.invoke(target, objects.toArray())).toArray((T[]) Array.newInstance(method.getReturnType(), 0));
+            return wrapArray(method.invoke(target, objects.toArray()));
         } catch (Throwable throwable) {
             throwable.printStackTrace();
             return null;

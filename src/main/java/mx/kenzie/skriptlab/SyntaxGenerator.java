@@ -21,13 +21,12 @@ import org.bukkit.Bukkit;
 import org.bukkit.event.Event;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
+import org.objectweb.asm.*;
 
 import java.lang.reflect.*;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import static org.objectweb.asm.Opcodes.*;
@@ -317,7 +316,12 @@ public class SyntaxGenerator {
     @SuppressWarnings("unchecked")
     protected <Expr>
     void registerSimpleExpression(final Method method, final String... syntax) {
-        final Class<GeneratedSimpleExpression<Expr>> cls = this.generateSimpleExpressionClass();
+        final Class<GeneratedSimpleExpression<Expr>> cls;
+        if (Modifier.isPublic(method.getModifiers())) {
+            cls = this.generateSimpleExpressionClass(method); // Inline version for public cases
+        } else {
+            cls = this.generateSimpleExpressionClass(); // Reflective version
+        }
         assert cls != null;
         final Changer.ChangeMode[] modes = method.isAnnotationPresent(Expression.class)
             ? method.getAnnotation(Expression.class).allowedModes()
@@ -815,6 +819,127 @@ public class SyntaxGenerator {
             method.visitMethodInsn(INVOKEVIRTUAL, internalName, "getReturnType", "(Ljava/lang/reflect/Method;)Ljava/lang/Class;", false);
             method.visitInsn(ARETURN);
             method.visitMaxs(2, 1);
+            method.visitEnd();
+        }
+        syntax: addSyntaxGetter(writer, internalName);
+        writer.visitEnd();
+        final byte[] bytecode = writer.toByteArray();
+        try {
+            final Class<?> cls = loadClass(namespace, bytecode);
+            return (Class<GeneratedSimpleExpression<Expr>>) cls;
+        } catch (Throwable ex) {
+            throw new SyntaxCreationException(ex);
+        }
+    }
+    
+    /**
+     * An alternative generator that takes an explicit method hook to avoid reflection.
+     */
+    protected synchronized <Expr>
+    Class<GeneratedSimpleExpression<Expr>> generateSimpleExpressionClass(Method binder)
+        throws SyntaxCreationException {
+        final String namespace = "mx.kenzie.skriptlab.generated.$SimpleExpression" + this.hashCode() + "$" + (++index);
+        final String internalName = namespace.replace(".", "/");
+        final String superName = "mx/kenzie/skriptlab/template/GeneratedSimpleExpression";
+        final ClassWriter writer = new ClassWriter(ASM9 + ClassWriter.COMPUTE_MAXS);
+        writer.visit(V11, ACC_PUBLIC | ACC_SUPER,
+            internalName, null, superName,
+            null);
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "syntax", "Ljava/lang/String;", null, null).visitEnd();
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "method", "Ljava/lang/reflect/Method;", null, null).visitEnd();
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "modes", "[Lch/njol/skript/classes/Changer$ChangeMode;", null, null)
+            .visitEnd();
+        constructor: addEmptyLoadConstructor(writer, superName);
+        get: {
+            final MethodVisitor method = writer
+                .visitMethod(ACC_PROTECTED, "get", "(Lorg/bukkit/event/Event;)[Ljava/lang/Object;", "(Lorg/bukkit/event/Event;)[TT;", null);
+            method.visitCode();
+            if (isSimple(binder)) {
+                method.visitMethodInsn(INVOKESTATIC, this.internalName(binder.getDeclaringClass()), binder
+                    .getName(), "()" + binder.getReturnType().descriptorString(), false);
+                method.visitVarInsn(ASTORE, 2);
+                method.visitVarInsn(ALOAD, 0);
+                method.visitVarInsn(ALOAD, 2);
+                method
+                    .visitMethodInsn(INVOKEVIRTUAL, internalName, "wrapArray", "(Ljava/lang/Object;)[Ljava/lang/Object;", false);
+                method.visitInsn(ARETURN);
+                method.visitMaxs(3, 2);
+            } else {
+                final boolean dynamic = !Modifier.isStatic(binder.getModifiers());
+                method.visitVarInsn(ALOAD, 0); // Trough this
+                method.visitVarInsn(ALOAD, 1); // Trough event
+                method
+                    .visitMethodInsn(INVOKEVIRTUAL, internalName, "getConvertedExpressions", "(Lorg/bukkit/event/Event;)Ljava/util/List;", false);
+                method.visitVarInsn(ASTORE, 2); // this, event -> Object list goes in slot 2
+                if (dynamic) { // Trough the first input as the object
+                    method.visitVarInsn(ALOAD, 2);
+                    method.visitInsn(ICONST_0);
+                    method.visitMethodInsn(INVOKEINTERFACE, "java/util/List", "remove", "(I)Ljava/lang/Object;", true);
+                    method.visitTypeInsn(CHECKCAST, this.internalName(binder.getDeclaringClass()));
+                }
+                final StringBuilder builder = new StringBuilder("(");
+                for (Class<?> type : binder.getParameterTypes()) { // If empty then ()
+                    method.visitVarInsn(ALOAD, 2);
+                    method.visitInsn(ICONST_0);
+                    method.visitMethodInsn(INVOKEINTERFACE, "java/util/List", "remove", "(I)Ljava/lang/Object;", true);
+                    method.visitTypeInsn(CHECKCAST, this.internalName(type));
+                    builder.append(type.descriptorString());
+                }
+                builder.append(")").append(binder.getReturnType().descriptorString());
+                if (dynamic) {
+                    method.visitMethodInsn(INVOKEVIRTUAL, this.internalName(binder.getDeclaringClass()), binder
+                        .getName(), builder.toString(), false);
+                } else {
+                    method.visitMethodInsn(INVOKESTATIC, this.internalName(binder.getDeclaringClass()), binder
+                        .getName(), builder.toString(), false);
+                }
+                method.visitTypeInsn(CHECKCAST, this.internalName(Object.class));
+                method.visitVarInsn(ALOAD, 0); // Trough this
+                method.visitInsn(SWAP); // This, object
+                method
+                    .visitMethodInsn(INVOKEVIRTUAL, internalName, "wrapArray", "(Ljava/lang/Object;)[Ljava/lang/Object;", false);
+                method.visitInsn(ARETURN); // Result is troughed and returned
+                method.visitMaxs(3 + binder.getParameterTypes().length, 3);
+            }
+            method.visitEnd();
+        }
+        change: {
+            final MethodVisitor method = writer
+                .visitMethod(ACC_PUBLIC, "change", "(Lorg/bukkit/event/Event;[Ljava/lang/Object;Lch/njol/skript/classes/Changer$ChangeMode;)V", null, null);
+            method.visitCode();
+            method.visitInsn(RETURN);
+            method.visitMaxs(0, 0);
+            method.visitEnd();
+        }
+        accept_change: {
+            final MethodVisitor method = writer
+                .visitMethod(ACC_PUBLIC, "acceptChange", "(Lch/njol/skript/classes/Changer$ChangeMode;)[Ljava/lang/Class;", "(Lch/njol/skript/classes/Changer$ChangeMode;)[Ljava/lang/Class<*>;", null);
+            method.visitCode();
+            method.visitInsn(ACONST_NULL);
+            method.visitInsn(ARETURN);
+            method.visitMaxs(1, 0);
+            method.visitEnd();
+        }
+        is_single: {
+            final MethodVisitor method = writer.visitMethod(ACC_PUBLIC, "isSingle", "()Z", null, null);
+            method.visitCode();
+            method.visitInsn(binder.getReturnType().isArray()
+                ? ICONST_0
+                : Collection.class.isAssignableFrom(binder.getReturnType())
+                ? ICONST_0
+                : ICONST_1
+            );
+            method.visitInsn(IRETURN);
+            method.visitMaxs(1, 0);
+            method.visitEnd();
+        }
+        return_type: {
+            final MethodVisitor method = writer
+                .visitMethod(ACC_PUBLIC, "getReturnType", "()Ljava/lang/Class;", "()Ljava/lang/Class<+TT;>;", null);
+            method.visitCode();
+            method.visitLdcInsn(Type.getType(binder.getReturnType().descriptorString()));
+            method.visitInsn(ARETURN);
+            method.visitMaxs(1, 0);
             method.visitEnd();
         }
         syntax: addSyntaxGetter(writer, internalName);
