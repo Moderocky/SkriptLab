@@ -89,6 +89,22 @@ public class SyntaxGenerator {
         }
     }
     
+    /**
+     * Generate, compile and register a class for a Skript type with property-referent objects.
+     * @param typeName The unique type name, e.g. `player` or `shoe`
+     * @param propertyTypes The classes for properties
+     * @param propertyNames The names for properties, corresponds to the order of classes
+     * @param <CompiledType> The resultant type
+     * @return The type class, post-registration
+     */
+    public <CompiledType extends GeneratedType>
+    Class<GeneratedType> createType(final String typeName, final Class<?>[] propertyTypes, final String[] propertyNames) {
+        assert propertyTypes.length == propertyNames.length;
+        final Class<GeneratedType> type = this.generateTypeClass(typeName, propertyTypes, propertyNames);
+        this.registerSyntax(type);
+        return type;
+    }
+    
     protected void registerSyntax(final Class<?> cls) {
         type: if (cls.isAnnotationPresent(SkriptType.class)) {
             registerType(cls);
@@ -373,6 +389,37 @@ public class SyntaxGenerator {
     //endregion
     
     //region Class Generation
+    protected synchronized <CompiledType extends GeneratedType>
+    Class<CompiledType> generateTypeClass(final String typeName, final Class<?>[] propertyTypes, final String[] propertyNames)
+        throws SyntaxCreationException {
+        final String namespace = "mx.kenzie.skriptlab.generated.$Type" + this.hashCode() + "$" + typeName;
+        final String internalName = namespace.replace(".", "/");
+        final String superName = this.internalName(GeneratedType.class);
+        final ClassWriter writer = new ClassWriter(ASM9 + ClassWriter.COMPUTE_MAXS);
+        writer.visit(V11, ACC_PUBLIC | ACC_SUPER, internalName, null, superName,null);
+        final AnnotationVisitor annotation = writer.visitAnnotation(SkriptType.class.descriptorString(), true);
+        annotation.visit("value", typeName);
+        annotation.visitEnd();
+        fields: {
+            for (int i = 0; i < propertyTypes.length; i++) {
+                final Class<?> type = propertyTypes[i];
+                final String name = propertyNames[i];
+                final FieldVisitor field = writer.visitField(ACC_PUBLIC, name, type.descriptorString(), null, null);
+                field.visitAnnotation(Property.class.descriptorString(), true).visitEnd();
+                field.visitEnd();
+            }
+        }
+        constructor: addEmptyLoadConstructor(writer, superName);
+        writer.visitEnd();
+        final byte[] bytecode = writer.toByteArray();
+        try {
+            final Class<?> cls = loadClass(namespace, bytecode);
+            return (Class<CompiledType>) cls;
+        } catch (Throwable ex) {
+            throw new SyntaxCreationException(ex);
+        }
+    }
+    
     protected synchronized <EventType extends Event, Value>
     Class<? extends Getter<Value, EventType>> generateGetterClass(final Method binder)
         throws SyntaxCreationException {
