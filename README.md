@@ -32,7 +32,7 @@ SkriptLab aims to solve this through the following goals:
 <dependency>
     <groupId>mx.kenzie</groupId>
     <artifactId>skriptlab</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <scope>compile</scope>
 </dependency>
 ```

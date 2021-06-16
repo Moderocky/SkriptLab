@@ -746,16 +746,9 @@ public class SyntaxGenerator {
         }
         change: {
             final MethodVisitor method = writer.visitMethod(ACC_PUBLIC, "change", "(Lorg/bukkit/event/Event;[Ljava/lang/Object;Lch/njol/skript/classes/Changer$ChangeMode;)V", null, null);
-            method.visitAnnotableParameterCount(3, false);
             method.visitCode();
-            method.visitVarInsn(ALOAD, 0);
-            method.visitVarInsn(ALOAD, 1);
-            method.visitVarInsn(ALOAD, 2);
-            method.visitVarInsn(ALOAD, 3);
-            method.visitFieldInsn(GETSTATIC, internalName, "field", "Ljava/lang/reflect/Field;");
-            method.visitMethodInsn(INVOKEVIRTUAL, internalName, "change", "(Lorg/bukkit/event/Event;[Ljava/lang/Object;Lch/njol/skript/classes/Changer$ChangeMode;Ljava/lang/reflect/Field;)V", false);
-            method.visitInsn(RETURN);
-            method.visitMaxs(5, 4);
+            if (isNumber(binder.getType())) numberChanger(method, internalName, binder);
+            else simpleChanger(method, internalName, binder);
             method.visitEnd();
         }
         modes: {
@@ -784,6 +777,156 @@ public class SyntaxGenerator {
         }
     }
     
+    //region Changer Method Bodies
+    private void simpleChanger(MethodVisitor method, String internalName, Field binder) {
+        final Label entry = new Label(), exit = new Label();
+        method.visitVarInsn(ALOAD, 0);
+        method.visitVarInsn(ALOAD, 1);
+        method.visitMethodInsn(INVOKEVIRTUAL, internalName, "getConvertedExpressions", "(Lorg/bukkit/event/Event;)Ljava/util/List;", false);
+        method.visitVarInsn(ASTORE, 4);
+        method.visitVarInsn(ALOAD, 4);
+        method.visitMethodInsn(INVOKEINTERFACE, "java/util/List", "iterator", "()Ljava/util/Iterator;", true);
+        method.visitVarInsn(ASTORE, 5);
+        method.visitLabel(entry); // Enter loop
+        method.visitFrame(F_APPEND, 2, new Object[]{"java/util/List", "java/util/Iterator"}, 0, null);
+        method.visitVarInsn(ALOAD, 5);
+        method.visitMethodInsn(INVOKEINTERFACE, "java/util/Iterator", "hasNext", "()Z", true);
+        method.visitJumpInsn(IFEQ, exit); // if done go exit :)
+        method.visitVarInsn(ALOAD, 5);
+        method.visitMethodInsn(INVOKEINTERFACE, "java/util/Iterator", "next", "()Ljava/lang/Object;", true);
+        method.visitVarInsn(ASTORE, 6); // storing target as Object
+        method.visitVarInsn(ALOAD, 6); // this makes calculating the Frame a lot simpler
+        method.visitTypeInsn(CHECKCAST, this.internalName(binder.getDeclaringClass()));
+        method.visitVarInsn(ASTORE, 7); // storing target as Type
+        method.visitVarInsn(ALOAD, 7);  // not actually necessary (could DUP) but easier for Frame calc at end
+        method.visitVarInsn(ALOAD, 2);
+        method.visitInsn(ICONST_0); // index 0
+        method.visitInsn(AALOAD); // getting the first item out of delta[0] since isSingle
+        this.assertPrimitiveCast(method, binder.getType());
+        if (!binder.getType().isPrimitive()) method.visitTypeInsn(CHECKCAST, this.internalName(binder.getType()));
+        method.visitFieldInsn(PUTFIELD, this.internalName(binder.getDeclaringClass()), binder.getName(), binder.getType().descriptorString());
+        method.visitJumpInsn(GOTO, entry); // back to top, next object
+        method.visitLabel(exit); // Exit loop
+        method.visitFrame(F_CHOP, 1, null, 0, null);
+        method.visitInsn(RETURN);
+        method.visitMaxs(3, 8);
+    }
+    
+    private void numberChanger(MethodVisitor method, String internalName, Field binder) {
+        final Label entry = new Label(), exit = new Label(), add = new Label(),finish = new Label(),remove = new Label();
+        method.visitVarInsn(ALOAD, 0);
+        method.visitVarInsn(ALOAD, 1);
+        method.visitMethodInsn(INVOKEVIRTUAL, internalName, "getConvertedExpressions", "(Lorg/bukkit/event/Event;)Ljava/util/List;", false);
+        method.visitVarInsn(ASTORE, 4);
+        method.visitVarInsn(ALOAD, 4);
+        method.visitMethodInsn(INVOKEINTERFACE, "java/util/List", "iterator", "()Ljava/util/Iterator;", true);
+        method.visitVarInsn(ASTORE, 5); // we're going over multiple Targets here so we use an iterator
+        method.visitLabel(entry); // top of the iterator
+        method.visitFrame(F_APPEND, 2, new Object[]{"java/util/List", "java/util/Iterator"}, 0, null);
+        method.visitVarInsn(ALOAD, 5);
+        method.visitMethodInsn(INVOKEINTERFACE, "java/util/Iterator", "hasNext", "()Z", true);
+        method.visitJumpInsn(IFEQ, exit); // finished iterating -> go exit
+        method.visitVarInsn(ALOAD, 5);
+        method.visitMethodInsn(INVOKEINTERFACE, "java/util/Iterator", "next", "()Ljava/lang/Object;", true);
+        method.visitVarInsn(ASTORE, 6);
+        method.visitVarInsn(ALOAD, 6);
+        method.visitTypeInsn(CHECKCAST, this.internalName(binder.getDeclaringClass())); // type it as real type not Object
+        method.visitVarInsn(ASTORE, 7);
+        method.visitVarInsn(ALOAD, 3);
+        method.visitFieldInsn(GETSTATIC, "ch/njol/skript/classes/Changer$ChangeMode", "SET", "Lch/njol/skript/classes/Changer$ChangeMode;");
+        method.visitJumpInsn(IF_ACMPNE, add); // not set ? jump to ADD check
+        method.visitVarInsn(ALOAD, 7);
+        method.visitVarInsn(ALOAD, 2);
+        method.visitInsn(ICONST_0); // index 0
+        method.visitInsn(AALOAD); // first object of the delta array
+        this.assertPrimitiveCast(method, binder.getType()); // convert our (probably) Number to a primitive
+        method.visitFieldInsn(PUTFIELD, this.internalName(binder.getDeclaringClass()), binder.getName(), binder.getType().descriptorString());
+        method.visitJumpInsn(GOTO, finish); // jump to bottom -> go next
+        method.visitLabel(add);
+        method.visitFrame(F_APPEND, 2, new Object[]{"java/lang/Object", this.internalName(binder.getDeclaringClass())}, 0, null);
+        method.visitVarInsn(ALOAD, 3);
+        method.visitFieldInsn(GETSTATIC, "ch/njol/skript/classes/Changer$ChangeMode", "ADD", "Lch/njol/skript/classes/Changer$ChangeMode;");
+        method.visitJumpInsn(IF_ACMPNE, remove); // not add ? jump to REMOVE check
+        method.visitVarInsn(ALOAD, 7);
+        method.visitInsn(DUP);
+        method.visitFieldInsn(GETFIELD, this.internalName(binder.getDeclaringClass()), binder.getName(), binder.getType().descriptorString());
+        method.visitVarInsn(ALOAD, 2);
+        method.visitInsn(ICONST_0); // index 0
+        method.visitInsn(AALOAD); // first object of the delta array
+        this.assertPrimitiveCast(method, binder.getType()); // convert our (probably) Number to a primitive
+        this.sumPrimitives(method, binder.getType()); // sum by correct opcode
+        method.visitFieldInsn(PUTFIELD, this.internalName(binder.getDeclaringClass()), binder.getName(), binder.getType().descriptorString());
+        method.visitJumpInsn(GOTO, finish); // jump to bottom -> go next
+        method.visitLabel(remove);
+        method.visitFrame(F_SAME, 0, null, 0, null);
+        method.visitVarInsn(ALOAD, 3);
+        method.visitFieldInsn(GETSTATIC, "ch/njol/skript/classes/Changer$ChangeMode", "REMOVE", "Lch/njol/skript/classes/Changer$ChangeMode;");
+        method.visitJumpInsn(IF_ACMPNE, finish); // not remove ? don't care -> go next
+        method.visitVarInsn(ALOAD, 7);
+        method.visitInsn(DUP);
+        method.visitFieldInsn(GETFIELD, this.internalName(binder.getDeclaringClass()), binder.getName(), binder.getType().descriptorString());
+        method.visitVarInsn(ALOAD, 2);
+        method.visitInsn(ICONST_0); // index 0
+        method.visitInsn(AALOAD); // first object of the delta array
+        this.assertPrimitiveCast(method, binder.getType()); // convert our (probably) Number to a primitive
+        this.subPrimitives(method, binder.getType()); // subtract by correct opcode
+        method.visitFieldInsn(PUTFIELD, this.internalName(binder.getDeclaringClass()), binder.getName(), binder.getType().descriptorString());
+        method.visitLabel(finish); // bottom of the iterator, when we jump out of if-checks
+        method.visitFrame(F_CHOP, 2, null, 0, null);
+        method.visitJumpInsn(GOTO, entry);
+        method.visitLabel(exit);
+        method.visitFrame(F_CHOP, 1, null, 0, null);
+        method.visitInsn(RETURN);
+        method.visitMaxs(5, 8);
+    }
+    
+    private void sumPrimitives(MethodVisitor method, Class<?> type) {
+        if (type == byte.class
+            || type == int.class
+            || type == short.class
+        ) method.visitInsn(IADD);
+        else if (type == long.class) method.visitInsn(LADD);
+        else if (type == float.class) method.visitInsn(FADD);
+        else if (type == double.class) method.visitInsn(DADD);
+    }
+    
+    private void subPrimitives(MethodVisitor method, Class<?> type) {
+        if (type == byte.class
+            || type == int.class
+            || type == short.class
+        ) method.visitInsn(ISUB);
+        else if (type == long.class) method.visitInsn(LSUB);
+        else if (type == float.class) method.visitInsn(FSUB);
+        else if (type == double.class) method.visitInsn(DSUB);
+    }
+    
+    private void assertPrimitiveCast(MethodVisitor method, Class<?> type) {
+        if (type == boolean.class) {
+            method.visitTypeInsn(CHECKCAST, "java/lang/Boolean");
+            method.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Boolean", "booleanValue", "()Z", false);
+        } else if (type == byte.class) {
+            method.visitTypeInsn(CHECKCAST, "java/lang/Number");
+            method.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Number", "byteValue", "()" + byte.class.descriptorString(), false);
+        } else if (type == int.class) {
+            method.visitTypeInsn(CHECKCAST, "java/lang/Number");
+            method.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Number", "intValue", "()" + int.class.descriptorString(), false);
+        } else if (type == short.class) {
+            method.visitTypeInsn(CHECKCAST, "java/lang/Number");
+            method.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Number", "shortValue", "()" + short.class.descriptorString(), false);
+        } else if (type == long.class) {
+            method.visitTypeInsn(CHECKCAST, "java/lang/Number");
+            method.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Number", "longValue", "()" + long.class.descriptorString(), false);
+        } else if (type == float.class) {
+            method.visitTypeInsn(CHECKCAST, "java/lang/Number");
+            method.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Number", "floatValue", "()" + float.class.descriptorString(), false);
+        } else if (type == double.class) {
+            method.visitTypeInsn(CHECKCAST, "java/lang/Number");
+            method.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Number", "doubleValue", "()D", false);
+        }
+    }
+    //endregion
+    
+    //region Changer Type Method Bodies
     private void finalChangeTypes(MethodVisitor method, String internalName, Field binder) {
         method.visitInsn(ACONST_NULL); // If the field is final we can't have changers
         method.visitInsn(ARETURN);
@@ -814,10 +957,10 @@ public class SyntaxGenerator {
         final Label allowed = new Label(), exit = new Label();
         method.visitVarInsn(ALOAD, 1); // could DUP instead of repeat load but don't want frame conflict with jump
         method.visitFieldInsn(GETSTATIC, "ch/njol/skript/classes/Changer$ChangeMode", "SET", "Lch/njol/skript/classes/Changer$ChangeMode;");
-        method.visitJumpInsn(IF_ACMPEQ, allowed);
+        method.visitJumpInsn(IF_ACMPEQ, allowed); // yes -> allowed
         method.visitVarInsn(ALOAD, 1);
         method.visitFieldInsn(GETSTATIC, "ch/njol/skript/classes/Changer$ChangeMode", "ADD", "Lch/njol/skript/classes/Changer$ChangeMode;");
-        method.visitJumpInsn(IF_ACMPEQ, allowed);
+        method.visitJumpInsn(IF_ACMPEQ, allowed); // yes -> allowed
         method.visitVarInsn(ALOAD, 1);
         method.visitFieldInsn(GETSTATIC, "ch/njol/skript/classes/Changer$ChangeMode", "REMOVE", "Lch/njol/skript/classes/Changer$ChangeMode;");
         method.visitJumpInsn(IF_ACMPNE, exit); // not remove ? exit otherwise run into allowed types
@@ -837,6 +980,7 @@ public class SyntaxGenerator {
         method.visitInsn(ARETURN);
         method.visitMaxs(4, 2);
     }
+    //endregion
     
     /**
      * Used when the property field is complex or private.
@@ -1163,7 +1307,7 @@ public class SyntaxGenerator {
     }
     
     protected String internalName(Class<?> cls) {
-        return cls.getName().replace(".", "/");
+        return Type.getInternalName(cls);
     }
     
     protected boolean isSimple(Field field) {
