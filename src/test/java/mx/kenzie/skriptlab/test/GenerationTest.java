@@ -8,9 +8,12 @@ import mx.kenzie.skriptlab.template.*;
 import org.bukkit.event.Event;
 import org.junit.Test;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 public class GenerationTest {
+    
+    public boolean test;
     
     @Test
     public void sample() throws Throwable {
@@ -28,10 +31,10 @@ public class GenerationTest {
         }.generatePropertyConditionClass();
         new SyntaxGenerator() {
             @Override
-            protected synchronized <ExpressionType> Class<GeneratedPropertyExpression<ExpressionType>> generatePropertyExpressionClass() throws SyntaxCreationException {
-                return super.generatePropertyExpressionClass();
+            protected synchronized <Expr> Class<GeneratedPropertyExpression<Expr>> generatePropertyExpressionClass(Field binder) throws SyntaxCreationException {
+                return super.generatePropertyExpressionClass(binder);
             }
-        }.generatePropertyExpressionClass();
+        }.generatePropertyExpressionClass(getClass().getField("test"));
         new SyntaxGenerator() {
             @Override
             protected synchronized <Expr> Class<GeneratedSimpleExpression<Expr>> generateSimpleExpressionClass() throws SyntaxCreationException {

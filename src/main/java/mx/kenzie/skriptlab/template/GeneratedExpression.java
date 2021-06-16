@@ -24,6 +24,16 @@ public abstract class GeneratedExpression<T> extends SimpleExpression<T> impleme
         return cls;
     }
     
+    //region Wrapper Stubs
+    protected T[] wrapArray(boolean q) { return wrapArray((Object) q); }
+    protected T[] wrapArray(byte q) { return wrapArray((Object) q); }
+    protected T[] wrapArray(double q) { return wrapArray((Object) q); }
+    protected T[] wrapArray(short q) { return wrapArray((Object) q); }
+    protected T[] wrapArray(long q) { return wrapArray((Object) q); }
+    protected T[] wrapArray(int q) { return wrapArray((Object) q); }
+    protected T[] wrapArray(float q) { return wrapArray((Object) q); }
+    //end-region
+    
     protected T[] wrapArray(Object object) {
         if (object == null) return null;
         else if (object.getClass().isArray()) {
