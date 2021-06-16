@@ -13,6 +13,7 @@ import ch.njol.skript.registrations.EventValues;
 import ch.njol.skript.util.Getter;
 import ch.njol.util.coll.CollectionUtils;
 import com.google.common.base.CaseFormat;
+import com.google.common.base.Verify;
 import mx.kenzie.skriptlab.annotation.*;
 import mx.kenzie.skriptlab.error.SyntaxCreationException;
 import mx.kenzie.skriptlab.error.SyntaxLoadException;
@@ -24,10 +25,9 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.*;
 
+import java.io.FileOutputStream;
 import java.lang.reflect.*;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 
 import static org.objectweb.asm.Opcodes.*;
 
@@ -171,6 +171,27 @@ public class SyntaxGenerator {
                 ? PropertyCondition.PropertyType.HAVE
                 : PropertyCondition.PropertyType.BE);
         }
+        method_property: {
+            final Map<String, SimplePropertyMeta> map = new HashMap<>();
+            for (final Method method : cls.getDeclaredMethods()) {
+                if (!method.isAnnotationPresent(Property.class)) continue;
+                warn: {
+                    if (Modifier.isPublic(method.getModifiers())) break warn;
+                    Bukkit.getLogger().warning("The plugin '" + plugin
+                        .getName() + "' attempted to register a non-public method '" + method
+                        .getName() + "' as a property handler. This has been skipped.");
+                }
+                final Property property = method.getAnnotation(Property.class);
+                map.putIfAbsent(property.value(), new SimplePropertyMeta(property.value()));
+                final SimplePropertyMeta meta = map.get(property.value());
+                final mx.kenzie.skriptlab.Changer[] changers = property.mode();
+                if (changers.length == 0) meta.get = method;
+                else meta.setHandler(changers, method);
+            }
+            for (SimplePropertyMeta value : map.values()) {
+                registerPropertyExpression(value);
+            }
+        }
         property_expression: for (final Field field : cls.getDeclaredFields()) {
             if (!field.isAnnotationPresent(Property.class)) continue;
             field.setAccessible(true);
@@ -205,7 +226,7 @@ public class SyntaxGenerator {
             ? cls.getDeclaredAnnotation(Documentation.class)
             : null;
         final String codename = type.value().isEmpty()
-            ? cls.getName().toLowerCase()
+            ? cls.getSimpleName().toLowerCase()
             : type.value();
         final String[] user = documentation != null
             ? documentation.user()
@@ -298,6 +319,8 @@ public class SyntaxGenerator {
             cls.getField("target").set(null, object);
             cls.getField("name").set(null, name);
             cls.getField("syntax").set(null, name);
+        } catch (VerifyError error) {
+            throw new SyntaxLoadException("Error during verification of generated class with syntax:\n\t" + name, error);
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new SyntaxLoadException("Unable to set method targets.", e);
         }
@@ -308,16 +331,39 @@ public class SyntaxGenerator {
     
     @SuppressWarnings("unchecked")
     protected <Expr>
+    void registerPropertyExpression(final SimplePropertyMeta meta) {
+        final Class<GeneratedPropertyExpression<Expr>> cls = this.generatePropertyExpressionClass(meta);
+        assert cls != null;
+        try {
+            cls.getField("syntax").set(null, meta.syntax);
+            cls.getField("types").set(null, meta.getModeMap());
+        } catch (VerifyError error) {
+            throw new SyntaxLoadException("Error during verification of generated class with syntax:\n\t" + (meta.syntax), error);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new SyntaxLoadException("Unable to set field targets.", e);
+        }
+        final ClassInfo<?> info = Classes.getExactClassInfo(meta.getDeclaringClass());
+        final String objectType = (info != null)
+            ? info.getCodeName()
+            :  "object";
+        Skript.registerExpression(cls, (Class<Expr>) this.ensureWrapperClass(meta.get.getReturnType()), ExpressionType.PROPERTY,
+            "[the] " + meta.syntax + " of %" + objectType + "%", "%"+ objectType+"%" + "'s " + meta.syntax);
+    }
+    
+    @SuppressWarnings("unchecked")
+    protected <Expr>
     void registerPropertyExpression(final Field field, final String name) {
         final Class<GeneratedPropertyExpression<Expr>> cls = this.generatePropertyExpressionClass(field);
         assert cls != null;
         final Changer.ChangeMode[] modes = field.isAnnotationPresent(Property.class)
-            ? field.getAnnotation(Property.class).allowedModes()
+            ? convert(field.getAnnotation(Property.class).mode())
             : new Changer.ChangeMode[0];
         try {
             cls.getField("field").set(null, field);
             cls.getField("modes").set(null, modes);
             cls.getField("syntax").set(null, name);
+        } catch (VerifyError error) {
+            throw new SyntaxLoadException("Error during verification of generated class with syntax:\n\t" + name, error);
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new SyntaxLoadException("Unable to set field targets.", e);
         }
@@ -325,7 +371,7 @@ public class SyntaxGenerator {
         final String objectType = (info != null)
             ? info.getCodeName()
             :  "object";
-        Skript.registerExpression(cls, (Class<Expr>) GeneratedExpression.ensureWrapper(field.getType()), ExpressionType.PROPERTY,
+        Skript.registerExpression(cls, (Class<Expr>) this.ensureWrapperClass(field.getType()), ExpressionType.PROPERTY,
             "[the] " + name + " of %" + objectType + "%", "%"+ objectType+"%" + "'s " + name);
     }
     
@@ -359,6 +405,9 @@ public class SyntaxGenerator {
         try {
             cls.getField("method").set(null, method);
             cls.getField("syntax").set(null, syntax[0]);
+        } catch (VerifyError error) {
+            throw new SyntaxLoadException("Error during verification of generated class with syntax:\n\t" + Arrays
+                .toString(syntax), error);
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new SyntaxLoadException("Unable to set method targets.", e);
         }
@@ -561,7 +610,8 @@ public class SyntaxGenerator {
                     method.visitVarInsn(ALOAD, 2);
                     method.visitInsn(ICONST_0);
                     method.visitMethodInsn(INVOKEINTERFACE, "java/util/List", "remove", "(I)Ljava/lang/Object;", true);
-                    method.visitTypeInsn(CHECKCAST, this.internalName(type));
+                    this.assertPrimitiveCast(method, type);
+                    if (!type.isPrimitive()) method.visitTypeInsn(CHECKCAST, this.internalName(type));
                     builder.append(type.descriptorString());
                 }
                 builder.append(")").append(binder.getReturnType().descriptorString());
@@ -695,6 +745,192 @@ public class SyntaxGenerator {
     }
     
     protected synchronized <Expr>
+    Class<GeneratedPropertyExpression<Expr>> generatePropertyExpressionClass(SimplePropertyMeta meta)
+        throws SyntaxCreationException {
+        final String namespace = "mx.kenzie.skriptlab.generated.$PropertyExpression" + this.hashCode() + "$" + (++index);
+        final String internalName = namespace.replace(".", "/");
+        final String superName = "mx/kenzie/skriptlab/template/GeneratedPropertyExpression";
+        final ClassWriter writer = new ClassWriter(ASM9 + ClassWriter.COMPUTE_MAXS);
+        writer.visit(V11, ACC_PUBLIC | ACC_SUPER,
+            internalName, null, superName,
+            null);
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "syntax", "Ljava/lang/String;", null, null).visitEnd();
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "types", "Ljava/util/Map;", "Ljava/util/Map<Lch/njol/skript/classes/Changer$ChangeMode;[Ljava/lang/Class<*>;>;", null).visitEnd();
+        constructor: addEmptyLoadConstructor(writer, superName);
+        get: {
+            final MethodVisitor method = writer.visitMethod(ACC_PROTECTED, "get", "(Lorg/bukkit/event/Event;)[Ljava/lang/Object;", "(Lorg/bukkit/event/Event;)[TT;", null);
+            method.visitCode();
+            method.visitVarInsn(ALOAD, 0);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(INVOKEVIRTUAL, internalName, "getConvertedExpressions", "(Lorg/bukkit/event/Event;)Ljava/util/List;", false);
+            method.visitInsn(ICONST_0);
+            method.visitMethodInsn(INVOKEINTERFACE, "java/util/List", "get", "(I)Ljava/lang/Object;", true);
+            method.visitTypeInsn(CHECKCAST, this.internalName(meta.getDeclaringClass()));
+            method.visitVarInsn(ASTORE, 2);
+            method.visitVarInsn(ALOAD, 0);
+            method.visitVarInsn(ALOAD, 2);
+            method.visitMethodInsn(INVOKEVIRTUAL, this.internalName(meta.get.getDeclaringClass()), meta.get.getName(), "()" + meta.get.getReturnType().descriptorString(), false);
+            method.visitMethodInsn(INVOKEVIRTUAL, internalName, "wrapArray", "(Ljava/lang/Object;)[Ljava/lang/Object;", false);
+            method.visitInsn(ARETURN);
+            method.visitMaxs(2, 3);
+            method.visitEnd();
+        }
+        change: { // For this we simply refer to the individual changer method, if it exists
+            final Label exit = new Label(),
+                notAdd = new Label(),
+                notSet = new Label(),
+                notRemove = new Label(),
+                notClear = new Label(),
+                notReset = new Label();
+            final MethodVisitor method = writer.visitMethod(ACC_PUBLIC, "change", "(Lorg/bukkit/event/Event;[Ljava/lang/Object;Lch/njol/skript/classes/Changer$ChangeMode;)V", null, null);
+            method.visitCode();
+            method.visitVarInsn(ALOAD, 3);
+            method.visitFieldInsn(GETSTATIC, "ch/njol/skript/classes/Changer$ChangeMode", "ADD", "Lch/njol/skript/classes/Changer$ChangeMode;");
+            method.visitJumpInsn(IF_ACMPNE, notAdd);
+            method.visitVarInsn(ALOAD, 0);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitVarInsn(ALOAD, 2);
+            method.visitMethodInsn(INVOKEVIRTUAL, internalName, "add", "(Lorg/bukkit/event/Event;[Ljava/lang/Object;)V", false);
+            method.visitJumpInsn(GOTO, exit);
+            method.visitLabel(notAdd);
+            method.visitFrame(F_SAME, 0, null, 0, null);
+            method.visitVarInsn(ALOAD, 3);
+            method.visitFieldInsn(GETSTATIC, "ch/njol/skript/classes/Changer$ChangeMode", "SET", "Lch/njol/skript/classes/Changer$ChangeMode;");
+            method.visitJumpInsn(IF_ACMPNE, notSet);
+            method.visitVarInsn(ALOAD, 0);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitVarInsn(ALOAD, 2);
+            method.visitMethodInsn(INVOKEVIRTUAL, internalName, "set", "(Lorg/bukkit/event/Event;[Ljava/lang/Object;)V", false);
+            method.visitJumpInsn(GOTO, exit);
+            method.visitLabel(notSet);
+            method.visitFrame(F_SAME, 0, null, 0, null);
+            method.visitVarInsn(ALOAD, 3);
+            method.visitFieldInsn(GETSTATIC, "ch/njol/skript/classes/Changer$ChangeMode", "REMOVE", "Lch/njol/skript/classes/Changer$ChangeMode;");
+            method.visitJumpInsn(IF_ACMPNE, notRemove);
+            method.visitVarInsn(ALOAD, 0);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitVarInsn(ALOAD, 2);
+            method.visitMethodInsn(INVOKEVIRTUAL, internalName, "remove", "(Lorg/bukkit/event/Event;[Ljava/lang/Object;)V", false);
+            method.visitJumpInsn(GOTO, exit);
+            method.visitLabel(notRemove);
+            method.visitFrame(F_SAME, 0, null, 0, null);
+            method.visitVarInsn(ALOAD, 3);
+            method.visitFieldInsn(GETSTATIC, "ch/njol/skript/classes/Changer$ChangeMode", "REMOVE_ALL", "Lch/njol/skript/classes/Changer$ChangeMode;");
+            method.visitJumpInsn(IF_ACMPNE, notClear);
+            method.visitVarInsn(ALOAD, 0);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitVarInsn(ALOAD, 2);
+            method.visitMethodInsn(INVOKEVIRTUAL, internalName, "removeAll", "(Lorg/bukkit/event/Event;[Ljava/lang/Object;)V", false);
+            method.visitJumpInsn(GOTO, exit);
+            method.visitLabel(notClear);
+            method.visitFrame(F_SAME, 0, null, 0, null);
+            method.visitVarInsn(ALOAD, 3);
+            method.visitFieldInsn(GETSTATIC, "ch/njol/skript/classes/Changer$ChangeMode", "RESET", "Lch/njol/skript/classes/Changer$ChangeMode;");
+            method.visitJumpInsn(IF_ACMPNE, notReset);
+            method.visitVarInsn(ALOAD, 0);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitVarInsn(ALOAD, 2);
+            method.visitMethodInsn(INVOKEVIRTUAL, internalName, "reset", "(Lorg/bukkit/event/Event;[Ljava/lang/Object;)V", false);
+            method.visitJumpInsn(GOTO, exit);
+            method.visitLabel(notReset);
+            method.visitFrame(F_SAME, 0, null, 0, null);
+            method.visitVarInsn(ALOAD, 3);
+            method.visitFieldInsn(GETSTATIC, "ch/njol/skript/classes/Changer$ChangeMode", "DELETE", "Lch/njol/skript/classes/Changer$ChangeMode;");
+            method.visitJumpInsn(IF_ACMPNE, exit);
+            method.visitVarInsn(ALOAD, 0);
+            method.visitVarInsn(ALOAD, 1);
+            method.visitVarInsn(ALOAD, 2);
+            method.visitMethodInsn(INVOKEVIRTUAL, internalName, "delete", "(Lorg/bukkit/event/Event;[Ljava/lang/Object;)V", false);
+            method.visitLabel(exit);
+            method.visitFrame(F_SAME, 0, null, 0, null);
+            method.visitInsn(RETURN);
+            method.visitMaxs(3, 4);
+            method.visitEnd();
+        }
+        changer_methods: {
+            for (Map.Entry<String, Method> map : meta.getHandles().entrySet()) {
+                final Method binder = map.getValue();
+                final String name = map.getKey();
+                final Label entry = new Label(), exit = new Label();
+                final MethodVisitor method = writer.visitMethod(ACC_PRIVATE, name, "(Lorg/bukkit/event/Event;[Ljava/lang/Object;)V", null, null);
+                method.visitCode();
+                method.visitVarInsn(ALOAD, 0);
+                method.visitVarInsn(ALOAD, 1);
+                method.visitMethodInsn(INVOKEVIRTUAL, internalName, "getConvertedExpressions", "(Lorg/bukkit/event/Event;)Ljava/util/List;", false);
+                method.visitVarInsn(ASTORE, 3);
+                method.visitVarInsn(ALOAD, 3);
+                method.visitMethodInsn(INVOKEINTERFACE, "java/util/List", "iterator", "()Ljava/util/Iterator;", true);
+                method.visitVarInsn(ASTORE, 4);
+                method.visitLabel(entry);
+                method.visitFrame(F_APPEND, 2, new Object[]{"java/util/List", "java/util/Iterator"}, 0, null);
+                method.visitVarInsn(ALOAD, 4);
+                method.visitMethodInsn(INVOKEINTERFACE, "java/util/Iterator", "hasNext", "()Z", true);
+                method.visitJumpInsn(IFEQ, exit); // exit loop
+                method.visitVarInsn(ALOAD, 4);
+                method.visitMethodInsn(INVOKEINTERFACE, "java/util/Iterator", "next", "()Ljava/lang/Object;", true);
+                method.visitVarInsn(ASTORE, 5);
+                method.visitVarInsn(ALOAD, 5);
+                method.visitTypeInsn(CHECKCAST, this.internalName(binder.getDeclaringClass())); // target
+                if (binder.getParameterTypes().length > 0) { // needs a delta input
+                    method.visitVarInsn(ALOAD, 2); // target, delta
+                    method.visitInsn(ICONST_0); // target, delta, 0
+                    method.visitInsn(AALOAD); // target, object
+                    method.visitTypeInsn(CHECKCAST, this.internalName(binder.getParameterTypes()[0])); // target, value
+                    method.visitMethodInsn(INVOKEVIRTUAL, this.internalName(binder.getDeclaringClass()), binder
+                        .getName(), "(" + binder.getParameterTypes()[0].descriptorString() + ")" + binder.getReturnType()
+                        .descriptorString(), false);
+                } else { // something like reset or delete idk
+                    method.visitMethodInsn(INVOKEVIRTUAL, this.internalName(binder.getDeclaringClass()), binder
+                        .getName(), "()" + binder.getReturnType()
+                        .descriptorString(), false);
+                }
+                method.visitJumpInsn(GOTO, entry); // back to top
+                method.visitLabel(exit);
+                method.visitFrame(F_CHOP, 1, null, 0, null);
+                method.visitInsn(RETURN);
+                method.visitMaxs(3, 6);
+                method.visitEnd();
+            }
+        }
+        return_type: {
+            final MethodVisitor method = writer.visitMethod(ACC_PUBLIC, "getReturnType", "()Ljava/lang/Class;", "()Ljava/lang/Class<+TT;>;", null);
+            method.visitCode();
+            method.visitLdcInsn(Type.getType(ensureWrapperClass(meta.get.getReturnType())));
+            method.visitInsn(ARETURN);
+            method.visitMaxs(1, 1);
+            method.visitEnd();
+        }
+        modes: {
+            final MethodVisitor method = writer.visitMethod(ACC_PUBLIC, "acceptChange", "(Lch/njol/skript/classes/Changer$ChangeMode;)[Ljava/lang/Class;", "(Lch/njol/skript/classes/Changer$ChangeMode;)[Ljava/lang/Class<*>;", null);
+            method.visitCode();
+            method.visitFieldInsn(GETSTATIC, internalName, "types", "Ljava/util/Map;");
+            method.visitVarInsn(ALOAD, 1);
+            method.visitMethodInsn(INVOKEINTERFACE, "java/util/Map", "get", "(Ljava/lang/Object;)Ljava/lang/Object;", true);
+            method.visitTypeInsn(CHECKCAST, "[Ljava/lang/Class;");
+            method.visitInsn(ARETURN);
+            method.visitMaxs(2, 2);
+            method.visitEnd();
+        }
+        single: {
+            final MethodVisitor method = writer.visitMethod(ACC_PUBLIC, "isSingle", "()Z", null, null);
+            method.visitCode();
+            method.visitInsn(meta.get.getReturnType().isArray() ? ICONST_0 : ICONST_1);
+            method.visitInsn(IRETURN);
+            method.visitMaxs(1, 1);
+            method.visitEnd();
+        }
+        syntax: addSyntaxGetter(writer, internalName);
+        writer.visitEnd();
+        final byte[] bytecode = writer.toByteArray();
+        try {
+            final Class<?> cls = loadClass(namespace, bytecode);
+            return (Class<GeneratedPropertyExpression<Expr>>) cls;
+        } catch (Throwable ex) {
+            throw new SyntaxCreationException(ex);
+        }
+    }
+    
+    protected synchronized <Expr>
     Class<GeneratedPropertyExpression<Expr>> generatePropertyExpressionClass(Field binder)
         throws SyntaxCreationException {
         final String namespace = "mx.kenzie.skriptlab.generated.$PropertyExpression" + this.hashCode() + "$" + (++index);
@@ -721,6 +957,7 @@ public class SyntaxGenerator {
         }
     }
     
+    //region Property Field Accessors
     /**
      * Used when the property field is public and:
      *  - a primitive number type
@@ -1054,6 +1291,7 @@ public class SyntaxGenerator {
             method.visitEnd();
         }
     }
+    //endregion
     
     protected synchronized <Expr>
     Class<GeneratedSimpleExpression<Expr>> generateSimpleExpressionClass()
@@ -1337,6 +1575,7 @@ public class SyntaxGenerator {
         ) return Number.class;
         if (type == boolean.class
         ) return Boolean.class;
+        if (type.isArray()) return this.ensureWrapperClass(type.getComponentType());
         return type;
     }
     
@@ -1349,6 +1588,21 @@ public class SyntaxGenerator {
             || type == float.class
             || type == double.class
         );
+    }
+    
+    protected Changer.ChangeMode[] convert(mx.kenzie.skriptlab.Changer... values) {
+        final List<Changer.ChangeMode> modes = new ArrayList<>();
+        for (mx.kenzie.skriptlab.Changer value : values) {
+            modes.add(switch (value) {
+                case SET -> Changer.ChangeMode.SET;
+                case ADD -> Changer.ChangeMode.ADD;
+                case RESET -> Changer.ChangeMode.RESET;
+                case REMOVE -> Changer.ChangeMode.REMOVE;
+                case REMOVE_ALL -> Changer.ChangeMode.REMOVE_ALL;
+                case DELETE -> Changer.ChangeMode.DELETE;
+            });
+        }
+        return modes.toArray(new Changer.ChangeMode[0]);
     }
     //endregion
     

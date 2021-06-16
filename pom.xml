@@ -6,7 +6,7 @@
 
     <groupId>mx.kenzie</groupId>
     <artifactId>skriptlab</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
     <name>SkriptLab</name>
     <description>A simple and lightweight tool to auto-generate Skript syntax.</description>
 

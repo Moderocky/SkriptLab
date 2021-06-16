@@ -1,6 +1,6 @@
 package mx.kenzie.skriptlab.annotation;
 
-import ch.njol.skript.classes.Changer;
+import mx.kenzie.skriptlab.Changer;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -13,6 +13,6 @@ public @interface Property {
     
     String value() default "";
     
-    Changer.ChangeMode[] allowedModes() default {Changer.ChangeMode.SET};
+    Changer[] mode() default {};
     
 }
