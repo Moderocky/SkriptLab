@@ -46,7 +46,7 @@ SkriptLab is accessed through a series of five basic annotations.
 |Effect|Method (void)|A runnable Skript effect. Inputs are passed to the method parameters. If used on a dynamic method, the first input is assumed to be the object.|
 |Condition|Method (boolean)|A condition. Inputs are passed to the method parameters. If used on a dynamic method, the first input is assumed to be the object.|
 |Expression|Method (any non-null)|An expression that returns a value. Inputs are passed to the method parameters. If used on a dynamic method, the first input is assumed to be the object.|
-|Property|Field (any)|An expression of the type `the X of Y` or `Y's X` where X is the property name and Y is the object. This may be used only on dynamic fields. Primitives and number types are automatically wrapped.|
+|Property|Field (any) / Methods|An expression of the type `the X of Y` or `Y's X` where X is the property name and Y is the object. This may be used only on dynamic fields. Primitives and number types are automatically wrapped.|
 |SkriptType|Class|Registers the given object class as a Skript Type, allowing it to be used in syntax.|
 
 The `Documentation` annotation can be used in conjunction with `SkriptType` to provide extra details for Skript's automatic user documentation generation. This is not necessary, and the type alone is all that is required for simple registration. 

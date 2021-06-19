@@ -110,9 +110,9 @@ public abstract class GeneratedPropertyExpression<T> extends GeneratedExpression
     
     @Override
     public String toString(Event event, boolean debug) {
-        final List<Object> inputs = new ArrayList<>();
+        final List<String> inputs = new ArrayList<>();
         for (final Expression<?> expression : expressions) {
-            inputs.add(expression.getSingle(event));
+            inputs.add(expression.toString(event, debug));
         }
         return String.format(this.getSyntax().replaceAll("%.+?%", "%s"), inputs.toArray());
     }

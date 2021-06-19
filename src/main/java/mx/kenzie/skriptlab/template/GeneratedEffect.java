@@ -38,9 +38,9 @@ public abstract class GeneratedEffect extends Effect implements GeneratedMember 
     
     @Override
     public String toString(Event event, boolean b) {
-        final List<Object> inputs = new ArrayList<>();
+        final List<String> inputs = new ArrayList<>();
         for (final Expression<?> expression : expressions) {
-            inputs.add(expression.getSingle(event));
+            inputs.add(expression.toString(event, b));
         }
         return String.format(this.getSyntax().replaceAll("%.+?%", "%s"), inputs.toArray());
     }
