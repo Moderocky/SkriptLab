@@ -8,10 +8,9 @@ import mx.kenzie.skriptlab.Expressions;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.NotNull;
 
-@FunctionalInterface
-public interface DirectEffect extends SyntaxElement {
+public interface DirectCondition extends SyntaxElement {
     
-    void execute(@NotNull Event event, Expressions inputs);
+    boolean check(@NotNull Event event, Expressions inputs);
     
     @Override
     default boolean init(Expression<?> @NotNull [] expressions,
