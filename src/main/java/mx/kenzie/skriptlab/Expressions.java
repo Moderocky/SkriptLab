@@ -35,7 +35,6 @@ public class Expressions implements Collection<Expression<?>> {
     }
     
     public <Type> Type[] getArray(int index) {
-        
         return (Type[]) expressions.get(index).getArray(event);
     }
     

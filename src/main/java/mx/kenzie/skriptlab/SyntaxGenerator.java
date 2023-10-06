@@ -3,11 +3,15 @@ package mx.kenzie.skriptlab;
 import ch.njol.skript.lang.SyntaxElement;
 import mx.kenzie.skriptlab.internal.GeneratedCondition;
 import mx.kenzie.skriptlab.internal.GeneratedEffect;
+import mx.kenzie.skriptlab.internal.GeneratedExpression;
 import mx.kenzie.skriptlab.template.DirectCondition;
 import mx.kenzie.skriptlab.template.DirectEffect;
+import mx.kenzie.skriptlab.template.DirectExpression;
 import org.bukkit.Bukkit;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Type;
 
 import java.io.Closeable;
 import java.lang.reflect.Field;
@@ -85,6 +89,24 @@ public class SyntaxGenerator extends ClassLoader {
         final String name = "GeneratedCondition" + generatedNumber.incrementAndGet();
         try (final ConditionMaker maker = new ConditionMaker(name, handler, patterns)) {
             final Class<? extends GeneratedCondition> type = (Class<? extends GeneratedCondition>) maker.make(this);
+            this.insertData(type, handler, patterns);
+            return new Syntax(type, patterns);
+        } catch (Exception ex) {
+            Bukkit.getLogger().log(Level.SEVERE, ex.getMessage(), ex);
+            return null;
+        }
+    }
+    
+    public <Type> Syntax createExpression(Class<Type> returnType, DirectExpression.Single<Type> handler, String... patterns) {
+        return this.createExpression(returnType, (DirectExpression<Type>) handler, patterns);
+    }
+    
+    @SuppressWarnings("unchecked")
+    public <Type> Syntax createExpression(Class<Type> returnType, DirectExpression<Type> handler, String... patterns) {
+        final String name = "GeneratedExpression" + generatedNumber.incrementAndGet();
+        try (final ExpressionMaker maker = new ExpressionMaker(returnType, name, handler, patterns)) {
+            final Class<? extends GeneratedExpression<Type>> type = (Class<? extends GeneratedExpression<Type>>) maker.make(
+                this);
             this.insertData(type, handler, patterns);
             return new Syntax(type, patterns);
         } catch (Exception ex) {
@@ -180,6 +202,69 @@ record ConditionMaker(String className, DirectCondition handler, String... patte
         //</editor-fold>
         //<editor-fold desc="Generate getPatterns method" defaultstate="collapsed">
         this.addPatternsMethod(internalName, writer);
+        //</editor-fold>
+        writer.visitEnd();
+        return writer.toByteArray();
+    }
+    
+}
+
+record ExpressionMaker(Class<?> returnType, String className, DirectExpression<?> handler,
+                       String... patterns) implements Maker {
+    
+    @Override
+    public void close() {
+    }
+    
+    @Override
+    public byte[] generate() {
+        final String internalName = "mx/kenzie/skriptlab/generated/" + this.className();
+        final ClassWriter writer = new ClassWriter(0);
+        //<editor-fold desc="Class meta and fields" defaultstate="collapsed">
+        writer.visit(V17, ACC_PUBLIC | ACC_SUPER, internalName, null,
+            "mx/kenzie/skriptlab/internal/GeneratedExpression", null);
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "handle",
+            "Lmx/kenzie/skriptlab/template/DirectExpression;", null, null).visitEnd();
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "patterns", "[Ljava/lang/String;", null,
+            null).visitEnd();
+        //</editor-fold>
+        //<editor-fold desc="Create empty constructor" defaultstate="collapsed">
+        this.addConstructor("mx/kenzie/skriptlab/internal/GeneratedExpression", writer);
+        //</editor-fold>
+        //<editor-fold desc="Generate getHandle method" defaultstate="collapsed">
+        final MethodVisitor getHandle = writer.visitMethod(ACC_PUBLIC, "getHandle",
+            "()Lmx/kenzie/skriptlab/template/DirectExpression;", null, null);
+        getHandle.visitCode();
+        getHandle.visitFieldInsn(GETSTATIC, internalName, "handle",
+            "Lmx/kenzie/skriptlab/template/DirectExpression;");
+        getHandle.visitInsn(ARETURN);
+        getHandle.visitMaxs(1, 1);
+        getHandle.visitEnd();
+        //</editor-fold>
+        //<editor-fold desc="Generate getPatterns method" defaultstate="collapsed">
+        this.addPatternsMethod(internalName, writer);
+        //</editor-fold>
+        //<editor-fold desc="Generate getReturnType method" defaultstate="collapsed">
+        final MethodVisitor getReturnType = writer.visitMethod(ACC_PUBLIC, "getReturnType", "()Ljava/lang/Class;", null,
+            null);
+        getReturnType.visitCode();
+        getReturnType.visitVarInsn(ALOAD, 0);
+        getReturnType.visitMethodInsn(INVOKEVIRTUAL, "mx/kenzie/skriptlab/generated/" + this.className(), "getHandle",
+            "()Lmx/kenzie/skriptlab/template/DirectExpression;", false);
+        getReturnType.visitMethodInsn(INVOKEINTERFACE, "mx/kenzie/skriptlab/template/DirectExpression", "getReturnType",
+            "()Ljava/lang/Class;", true);
+        getReturnType.visitVarInsn(ASTORE, 1); // the user might have provided a return type
+        getReturnType.visitVarInsn(ALOAD, 1);
+        final Label otherwise = new Label();
+        getReturnType.visitJumpInsn(IFNULL, otherwise); // if they didn't, we skip this part
+        getReturnType.visitVarInsn(ALOAD, 1);
+        getReturnType.visitInsn(ARETURN); // return their type
+        getReturnType.visitLabel(otherwise);
+        getReturnType.visitFrame(F_APPEND, 1, new Object[]{"java/lang/Class"}, 0, null);
+        getReturnType.visitLdcInsn(Type.getType(returnType)); // we use the class-known type
+        getReturnType.visitInsn(ARETURN);
+        getReturnType.visitMaxs(1, 2);
+        getReturnType.visitEnd();
         //</editor-fold>
         writer.visitEnd();
         return writer.toByteArray();

@@ -4,9 +4,9 @@ import ch.njol.skript.Skript;
 import ch.njol.skript.lang.Condition;
 import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Section;
-import ch.njol.skript.lang.TriggerItem;
+import ch.njol.skript.lang.SyntaxElement;
 
-public record Syntax(Class<? extends TriggerItem> type, String... patterns) {
+public record Syntax(Class<? extends SyntaxElement> type, String... patterns) {
     
     @SuppressWarnings("unchecked")
     public void register() {
