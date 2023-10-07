@@ -1,9 +1,6 @@
 package mx.kenzie.skriptlab;
 
 import ch.njol.skript.lang.SyntaxElement;
-import mx.kenzie.skriptlab.internal.GeneratedCondition;
-import mx.kenzie.skriptlab.internal.GeneratedEffect;
-import mx.kenzie.skriptlab.internal.GeneratedExpression;
 import mx.kenzie.skriptlab.template.DirectCondition;
 import mx.kenzie.skriptlab.template.DirectEffect;
 import mx.kenzie.skriptlab.template.DirectExpression;
@@ -71,42 +68,29 @@ public class SyntaxGenerator extends ClassLoader {
         this.generatedNumber = new AtomicInteger(0);
     }
     
-    @SuppressWarnings("unchecked")
     public Syntax createEffect(DirectEffect handler, String... patterns) {
         final String name = "GeneratedEffect" + generatedNumber.incrementAndGet();
-        try (final EffectMaker maker = new EffectMaker(name, handler, patterns)) {
-            final Class<? extends GeneratedEffect> type = (Class<? extends GeneratedEffect>) maker.make(this);
-            this.insertData(type, handler, patterns);
-            return new Syntax(type, patterns);
-        } catch (Exception ex) {
-            Bukkit.getLogger().log(Level.SEVERE, ex.getMessage(), ex);
-            return null;
-        }
+        return this.createSyntax(new EffectMaker(name, handler, patterns), handler, patterns);
     }
     
-    @SuppressWarnings("unchecked")
     public Syntax createCondition(DirectCondition handler, String... patterns) {
         final String name = "GeneratedCondition" + generatedNumber.incrementAndGet();
-        try (final ConditionMaker maker = new ConditionMaker(name, handler, patterns)) {
-            final Class<? extends GeneratedCondition> type = (Class<? extends GeneratedCondition>) maker.make(this);
-            this.insertData(type, handler, patterns);
-            return new Syntax(type, patterns);
-        } catch (Exception ex) {
-            Bukkit.getLogger().log(Level.SEVERE, ex.getMessage(), ex);
-            return null;
-        }
+        return this.createSyntax(new ConditionMaker(name, handler, patterns), handler, patterns);
     }
     
     public <Type> Syntax createExpression(Class<Type> returnType, DirectExpression.Single<Type> handler, String... patterns) {
         return this.createExpression(returnType, (DirectExpression<Type>) handler, patterns);
     }
     
-    @SuppressWarnings("unchecked")
     public <Type> Syntax createExpression(Class<Type> returnType, DirectExpression<Type> handler, String... patterns) {
         final String name = "GeneratedExpression" + generatedNumber.incrementAndGet();
-        try (final ExpressionMaker maker = new ExpressionMaker(returnType, name, handler, patterns)) {
-            final Class<? extends GeneratedExpression<Type>> type = (Class<? extends GeneratedExpression<Type>>) maker.make(
-                this);
+        return this.createSyntax(new ExpressionMaker(returnType, name, handler, patterns), handler, patterns);
+    }
+    
+    @SuppressWarnings("unchecked")
+    private Syntax createSyntax(Maker maker, SyntaxElement handler, String... patterns) {
+        try (maker) {
+            final Class<? extends SyntaxElement> type = (Class<? extends SyntaxElement>) maker.make(this);
             this.insertData(type, handler, patterns);
             return new Syntax(type, patterns);
         } catch (Exception ex) {
