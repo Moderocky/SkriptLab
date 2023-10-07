@@ -3,6 +3,7 @@ package mx.kenzie.skriptlab;
 import mx.kenzie.skriptlab.internal.GeneratedCondition;
 import mx.kenzie.skriptlab.internal.GeneratedEffect;
 import mx.kenzie.skriptlab.internal.GeneratedExpression;
+import mx.kenzie.skriptlab.internal.GeneratedPropertyCondition;
 import org.junit.Test;
 
 public class SyntaxGeneratorTest {
@@ -31,6 +32,16 @@ public class SyntaxGeneratorTest {
         assert GeneratedCondition.class.isAssignableFrom(syntax.type());
         assert syntax.patterns().length == 1;
         assert syntax.type().getConstructor().newInstance() instanceof GeneratedCondition;
+    }
+    
+    @Test
+    public void createPropertyCondition() throws Exception {
+        final SyntaxGenerator generator = new SyntaxGenerator();
+        final Syntax syntax = generator.createPropertyCondition(String::isBlank, String.class, "blank");
+        assert syntax.type().getSimpleName().equals("GeneratedCondition1");
+        assert GeneratedPropertyCondition.class.isAssignableFrom(syntax.type());
+        assert syntax.patterns().length == 2;
+        assert syntax.type().getConstructor().newInstance() instanceof GeneratedPropertyCondition;
     }
     
     @Test
