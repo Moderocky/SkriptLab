@@ -4,15 +4,14 @@ import ch.njol.skript.classes.ClassInfo;
 import ch.njol.skript.conditions.base.PropertyCondition;
 import ch.njol.skript.lang.SyntaxElement;
 import ch.njol.skript.registrations.Classes;
+import mx.kenzie.skriptlab.error.SyntaxCreationException;
 import mx.kenzie.skriptlab.template.DirectCondition;
 import mx.kenzie.skriptlab.template.DirectEffect;
 import mx.kenzie.skriptlab.template.DirectExpression;
 import mx.kenzie.skriptlab.template.DirectPropertyCondition;
-import org.bukkit.Bukkit;
 
 import java.lang.reflect.Field;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Level;
 
 public class SyntaxGenerator extends ClassLoader {
     
@@ -23,21 +22,21 @@ public class SyntaxGenerator extends ClassLoader {
         this.generatedNumber = new AtomicInteger(0);
     }
     
-    public Syntax createEffect(DirectEffect handler, String... patterns) {
+    public Syntax<DirectEffect> createEffect(DirectEffect handler, String... patterns) {
         final String name = "GeneratedEffect" + generatedNumber.incrementAndGet();
         return this.createSyntax(new EffectMaker(name, handler, patterns), handler, patterns);
     }
     
-    public Syntax createCondition(DirectCondition handler, String... patterns) {
+    public Syntax<DirectCondition> createCondition(DirectCondition handler, String... patterns) {
         final String name = "GeneratedCondition" + generatedNumber.incrementAndGet();
         return this.createSyntax(new ConditionMaker(name, handler, patterns), handler, patterns);
     }
     
-    public <Type> Syntax createPropertyCondition(DirectPropertyCondition<Type> handler, Class<Type> holder, String property) {
+    public <Type> Syntax<DirectPropertyCondition<Type>> createPropertyCondition(DirectPropertyCondition<Type> handler, Class<Type> holder, String property) {
         return this.createPropertyCondition(handler, holder, property, PropertyCondition.PropertyType.BE);
     }
     
-    public <Type> Syntax createPropertyCondition(DirectPropertyCondition<Type> handler, Class<Type> holder, String property, PropertyCondition.PropertyType propertyType) {
+    public <Type> Syntax<DirectPropertyCondition<Type>> createPropertyCondition(DirectPropertyCondition<Type> handler, Class<Type> holder, String property, PropertyCondition.PropertyType propertyType) {
         final String name = "GeneratedCondition" + generatedNumber.incrementAndGet();
         final ClassInfo<?> info = Classes.getExactClassInfo(holder); // we do our best if this isn't registered yet
         final String type;
@@ -84,7 +83,8 @@ public class SyntaxGenerator extends ClassLoader {
         try {
             final Field patternsField = type.getDeclaredField("patterns");
             patternsField.set(null, patterns);
-        } catch (NoSuchFieldException ignored) { // properties don't need to know their patterns
+        } catch (NoSuchFieldException ignored) {
+            // properties don't need to know their patterns
         }
     }
     
