@@ -57,25 +57,23 @@ public class SyntaxGenerator extends ClassLoader {
         return this.createSyntax(new PropertyConditionMaker(name, handler, property), handler, pattern, negated);
     }
     
-    public <Type> Syntax createExpression(Class<Type> returnType, DirectExpression.Single<Type> handler, String... patterns) {
+    public <Type> Syntax<DirectExpression<Type>> createExpression(Class<Type> returnType, DirectExpression.Single<Type> handler, String... patterns) {
         return this.createExpression(returnType, (DirectExpression<Type>) handler, patterns);
     }
     
-    public <Type> Syntax createExpression(Class<Type> returnType, DirectExpression<Type> handler, String... patterns) {
+    public <Type> Syntax<DirectExpression<Type>> createExpression(Class<Type> returnType, DirectExpression<Type> handler, String... patterns) {
         final String name = "GeneratedExpression" + generatedNumber.incrementAndGet();
         return this.createSyntax(new ExpressionMaker(returnType, name, handler, patterns), handler, patterns);
     }
     
     @SuppressWarnings("unchecked")
-    private Syntax createSyntax(Maker maker, SyntaxElement handler, String... patterns) {
+    private <Any extends SyntaxElement> Syntax<Any> createSyntax(Maker maker, SyntaxElement handler, String... patterns) {
         try (maker) {
             final Class<? extends SyntaxElement> type = (Class<? extends SyntaxElement>) maker.make(this);
             this.insertData(type, handler, patterns);
-            return new Syntax(type, patterns);
+            return (Syntax<Any>) new Syntax<>(type, handler, patterns);
         } catch (Exception ex) {
-            ex.printStackTrace();
-            Bukkit.getLogger().log(Level.SEVERE, ex.getMessage(), ex);
-            return null;
+            throw new SyntaxCreationException("Unable to create syntax holder.", ex);
         }
     }
     
