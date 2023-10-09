@@ -26,20 +26,20 @@ public class Expressions implements Collection<Expression<?>> {
     }
     
     public <Type> Type get(int index) {
-        return (Type) expressions.get(index).getSingle(event);
+        return (Type) this.getExpression(index).getSingle(event);
     }
     
     public <Type> Type getOrDefault(int index, Type alternative) {
-        final Optional<?> optional = expressions.get(index).getOptionalSingle(event);
+        final Optional<?> optional = this.getExpression(index).getOptionalSingle(event);
         return optional.map(object -> (Type) object).orElse(alternative);
     }
     
     public <Type> Type[] getArray(int index) {
-        return (Type[]) expressions.get(index).getArray(event);
+        return (Type[]) this.getExpression(index).getArray(event);
     }
     
     public <Type> Type[] getAll(int index) {
-        return (Type[]) expressions.get(index).getAll(event);
+        return (Type[]) this.getExpression(index).getAll(event);
     }
     
     @Override
