@@ -48,8 +48,8 @@ public class SyntaxExtractorTest {
     
     public static class Dummy {
         
-        @Effect
-        public static void test() {
+        @Effect("test %object%")
+        public void test() {
             System.out.println("test");
         }
         

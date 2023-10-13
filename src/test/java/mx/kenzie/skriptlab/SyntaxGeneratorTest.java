@@ -6,6 +6,7 @@ import mx.kenzie.skriptlab.internal.GeneratedExpression;
 import mx.kenzie.skriptlab.internal.GeneratedPropertyCondition;
 import org.junit.Test;
 
+@SuppressWarnings({"unchecked", "RawUseOfParameterized"})
 public class SyntaxGeneratorTest {
     
     @Test
