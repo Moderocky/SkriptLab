@@ -84,6 +84,14 @@ public class PatternDigest {
         return builder.toString().trim();
     }
     
+    public int getInputs() {
+        return inputs;
+    }
+    
+    public String getPattern() {
+        return pattern;
+    }
+    
     protected static class Input {}
     
 }
