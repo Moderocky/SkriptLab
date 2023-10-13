@@ -10,6 +10,7 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
 
 import java.io.Closeable;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 
 import static org.objectweb.asm.Opcodes.*;
@@ -248,66 +249,7 @@ record ExpressionMaker(Class<?> returnType, String className, DirectExpression<?
 
 record DirectEffectMaker(String className, SyntaxExtractor.MaybeEffect effect, String... patterns) implements Maker {
     
-    @Override
-    public void close() {
-    }
-    
-    @Override
-    public byte[] generate() {
-        final String internalName = "mx/kenzie/skriptlab/generated/" + this.className();
-        final ClassWriter writer = new ClassWriter(0);
-        //<editor-fold desc="Class meta and fields" defaultstate="collapsed">
-        writer.visit(V17, ACC_PUBLIC | ACC_SUPER, internalName, null,
-            "java/lang/Record", new String[]{"mx/kenzie/skriptlab/template/DirectEffect"});
-        writer.visitInnerClass("java/lang/invoke/MethodHandles$Lookup", "java/lang/invoke/MethodHandles", "Lookup",
-            ACC_PUBLIC | ACC_FINAL | ACC_STATIC);
-        writer.visitRecordComponent("effect",
-            "Lmx/kenzie/skriptlab/annotation/Effect;", null).visitEnd();
-        writer.visitField(ACC_PRIVATE | ACC_FINAL, "effect",
-            "Lmx/kenzie/skriptlab/annotation/Effect;", null, null).visitEnd();
-        //</editor-fold>
-        //<editor-fold desc="Create empty constructor" defaultstate="collapsed">
-        final MethodVisitor constructor = writer.visitMethod(ACC_PUBLIC, "<init>",
-            "(Lmx/kenzie/skriptlab/annotation/Effect;)V",
-            null, null);
-        constructor.visitParameter("effect", 0);
-        constructor.visitCode();
-        constructor.visitVarInsn(ALOAD, 0);
-        constructor.visitMethodInsn(INVOKESPECIAL, "java/lang/Record", "<init>", "()V", false);
-        constructor.visitVarInsn(ALOAD, 0);
-        constructor.visitVarInsn(ALOAD, 1);
-        constructor.visitFieldInsn(PUTFIELD, internalName, "effect",
-            "Lmx/kenzie/skriptlab/annotation/Effect;");
-        constructor.visitInsn(RETURN);
-        constructor.visitMaxs(2, 2);
-        constructor.visitEnd();
-        //</editor-fold>
-        //<editor-fold desc="Generate execute method" defaultstate="collapsed">
-        final MethodVisitor execute = writer.visitMethod(ACC_PUBLIC, "execute",
-            "(Lorg/bukkit/event/Event;Lmx/kenzie/skriptlab/Expressions;)V", null, null);
-        execute.visitCode();
-        final Class<?> result = effect.method.getReturnType();
-        final boolean isInterface = effect.method.getDeclaringClass().isInterface(),
-            isDynamic = !Modifier.isStatic(effect.method.getModifiers());
-        int index = 0;
-        if (isDynamic)
-            this.get(execute, index++, effect.method.getDeclaringClass());
-        for (final Class<?> type : effect.method.getParameterTypes())
-            this.get(execute, index++, type);
-        final int opcode = !isDynamic ? INVOKESTATIC : isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL;
-        execute.visitMethodInsn(opcode, Type.getInternalName(effect.method.getDeclaringClass()),
-            this.effect.method.getName(), Type.getMethodDescriptor(effect.method), isInterface);
-        if (result == double.class || result == long.class) execute.visitInsn(POP2);
-        else if (result != void.class) execute.visitInsn(POP);
-        execute.visitInsn(RETURN);
-        execute.visitMaxs(Math.max(2, 1 + effect.method.getParameterCount() + (isDynamic ? 1 : 0)), 3);
-        execute.visitEnd();
-        //</editor-fold>
-        writer.visitEnd();
-        return writer.toByteArray();
-    }
-    
-    private void get(MethodVisitor visitor, int index, Class<?> expected) {
+    private static void get(MethodVisitor visitor, int index, Class<?> expected) {
         final boolean array = expected.isArray();
         visitor.visitVarInsn(ALOAD, 2);
         switch (index) {
@@ -320,6 +262,117 @@ record DirectEffectMaker(String className, SyntaxExtractor.MaybeEffect effect, S
         visitor.visitMethodInsn(INVOKEVIRTUAL, "mx/kenzie/skriptlab/Expressions", array ? "getArray" : "get",
             array ? "(I)[Ljava/lang/Object;" : "(I)Ljava/lang/Object;", false);
         visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(expected));
+    }
+    
+    static void writeCall(MethodVisitor visitor, Method method) {
+        final boolean isInterface = method.getDeclaringClass().isInterface(),
+            isDynamic = !Modifier.isStatic(method.getModifiers());
+        int index = 0;
+        if (isDynamic)
+            DirectEffectMaker.get(visitor, index++, method.getDeclaringClass());
+        for (final Class<?> type : method.getParameterTypes())
+            DirectEffectMaker.get(visitor, index++, type);
+        final int opcode = !isDynamic ? INVOKESTATIC : isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL;
+        visitor.visitMethodInsn(opcode, Type.getInternalName(method.getDeclaringClass()),
+            method.getName(), Type.getMethodDescriptor(method), isInterface);
+    }
+    
+    @Override
+    public void close() {
+    }
+    
+    @Override
+    public byte[] generate() {
+        final String internalName = "mx/kenzie/skriptlab/generated/" + this.className();
+        final ClassWriter writer = new ClassWriter(0);
+        //<editor-fold desc="Class meta and fields" defaultstate="collapsed">
+        writer.visit(V17, ACC_PUBLIC | ACC_SUPER, internalName, null,
+            "java/lang/Record", new String[]{"mx/kenzie/skriptlab/template/DirectEffect"});
+        writer.visitRecordComponent("effect",
+            "Lmx/kenzie/skriptlab/annotation/Effect;", null).visitEnd();
+        writer.visitField(ACC_PRIVATE | ACC_FINAL, "effect",
+            "Lmx/kenzie/skriptlab/annotation/Effect;", null, null).visitEnd();
+        //</editor-fold>
+        //<editor-fold desc="Create empty constructor" defaultstate="collapsed">
+        final MethodVisitor constructor = writer.visitMethod(ACC_PUBLIC, "<init>",
+            "(Lmx/kenzie/skriptlab/annotation/Effect;)V",
+            null, null);
+        constructor.visitCode();
+        constructor.visitVarInsn(ALOAD, 0);
+        constructor.visitMethodInsn(INVOKESPECIAL, "java/lang/Record", "<init>", "()V", false);
+        constructor.visitVarInsn(ALOAD, 0);
+        constructor.visitVarInsn(ALOAD, 1);
+        constructor.visitFieldInsn(PUTFIELD, internalName, "effect",
+            "Lmx/kenzie/skriptlab/annotation/Effect;");
+        constructor.visitInsn(RETURN);
+        constructor.visitMaxs(2, 2);
+        constructor.visitEnd();
+        //</editor-fold>
+        //<editor-fold desc="Generate execute method" defaultstate="collapsed">
+        final boolean isDynamic = !Modifier.isStatic(effect.method.getModifiers());
+        final MethodVisitor execute = writer.visitMethod(ACC_PUBLIC, "execute",
+            "(Lorg/bukkit/event/Event;Lmx/kenzie/skriptlab/Expressions;)V", null, null);
+        execute.visitCode();
+        final Class<?> result = effect.method.getReturnType();
+        DirectEffectMaker.writeCall(execute, effect.method);
+        if (result == double.class || result == long.class) execute.visitInsn(POP2);
+        else if (result != void.class) execute.visitInsn(POP);
+        execute.visitInsn(RETURN);
+        execute.visitMaxs(Math.max(2, 1 + effect.method.getParameterCount() + (isDynamic ? 1 : 0)), 3);
+        execute.visitEnd();
+        //</editor-fold>
+        writer.visitEnd();
+        return writer.toByteArray();
+    }
+    
+}
+
+record DirectConditionMaker(String className, SyntaxExtractor.MaybeCondition condition,
+                            String... patterns) implements Maker {
+    
+    @Override
+    public void close() {
+    }
+    
+    @Override
+    public byte[] generate() {
+        final String internalName = "mx/kenzie/skriptlab/generated/" + this.className();
+        final ClassWriter writer = new ClassWriter(0);
+        //<editor-fold desc="Class meta and fields" defaultstate="collapsed">
+        writer.visit(V17, ACC_PUBLIC | ACC_SUPER, internalName, null,
+            "java/lang/Record", new String[]{"mx/kenzie/skriptlab/template/DirectCondition"});
+        writer.visitRecordComponent("condition",
+            "Lmx/kenzie/skriptlab/annotation/Condition;", null).visitEnd();
+        writer.visitField(ACC_PRIVATE | ACC_FINAL, "condition",
+            "Lmx/kenzie/skriptlab/annotation/Condition;", null, null).visitEnd();
+        //</editor-fold>
+        //<editor-fold desc="Create empty constructor" defaultstate="collapsed">
+        final MethodVisitor constructor = writer.visitMethod(ACC_PUBLIC, "<init>",
+            "(Lmx/kenzie/skriptlab/annotation/Condition;)V",
+            null, null);
+        constructor.visitCode();
+        constructor.visitVarInsn(ALOAD, 0);
+        constructor.visitMethodInsn(INVOKESPECIAL, "java/lang/Record", "<init>", "()V", false);
+        constructor.visitVarInsn(ALOAD, 0);
+        constructor.visitVarInsn(ALOAD, 1);
+        constructor.visitFieldInsn(PUTFIELD, internalName, "condition",
+            "Lmx/kenzie/skriptlab/annotation/Condition;");
+        constructor.visitInsn(RETURN);
+        constructor.visitMaxs(2, 2);
+        constructor.visitEnd();
+        //</editor-fold>
+        //<editor-fold desc="Generate execute method" defaultstate="collapsed">
+        final boolean isDynamic = !Modifier.isStatic(condition.method.getModifiers());
+        final MethodVisitor execute = writer.visitMethod(ACC_PUBLIC, "check",
+            "(Lorg/bukkit/event/Event;Lmx/kenzie/skriptlab/Expressions;)Z", null, null);
+        execute.visitCode();
+        DirectEffectMaker.writeCall(execute, condition.method);
+        execute.visitInsn(IRETURN);
+        execute.visitMaxs(Math.max(2, 1 + condition.method.getParameterCount() + (isDynamic ? 1 : 0)), 3);
+        execute.visitEnd();
+        //</editor-fold>
+        writer.visitEnd();
+        return writer.toByteArray();
     }
     
 }
