@@ -25,6 +25,10 @@ public class SyntaxGenerator extends ClassLoader {
         this.generatedNumber = new AtomicInteger(0);
     }
     
+    protected int nextClassIndex() {
+        return generatedNumber.incrementAndGet();
+    }
+    
     /**
      * Reads all special syntax annotations from a class and generates their syntax handlers.
      *
@@ -41,12 +45,12 @@ public class SyntaxGenerator extends ClassLoader {
     }
     
     public Syntax<DirectEffect> createEffect(DirectEffect handler, String... patterns) {
-        final String name = "GeneratedEffect" + generatedNumber.incrementAndGet();
+        final String name = "GeneratedEffect" + this.nextClassIndex();
         return this.createSyntax(new EffectMaker(name, handler, patterns), handler, patterns);
     }
     
     public Syntax<DirectCondition> createCondition(DirectCondition handler, String... patterns) {
-        final String name = "GeneratedCondition" + generatedNumber.incrementAndGet();
+        final String name = "GeneratedCondition" + this.nextClassIndex();
         return this.createSyntax(new ConditionMaker(name, handler, patterns), handler, patterns);
     }
     
@@ -55,7 +59,7 @@ public class SyntaxGenerator extends ClassLoader {
     }
     
     public <Type> Syntax<DirectPropertyCondition<Type>> createPropertyCondition(DirectPropertyCondition<Type> handler, Class<Type> holder, String property, PropertyCondition.PropertyType propertyType) {
-        final String name = "GeneratedCondition" + generatedNumber.incrementAndGet();
+        final String name = "GeneratedCondition" + this.nextClassIndex();
         final ClassInfo<?> info = Classes.getExactClassInfo(holder); // we do our best if this isn't registered yet
         final String type;
         if (info == null) type = holder.getSimpleName().toLowerCase();
@@ -79,7 +83,7 @@ public class SyntaxGenerator extends ClassLoader {
     }
     
     public <Type> Syntax<DirectExpression<Type>> createExpression(Class<Type> returnType, DirectExpression<Type> handler, String... patterns) {
-        final String name = "GeneratedExpression" + generatedNumber.incrementAndGet();
+        final String name = "GeneratedExpression" + this.nextClassIndex();
         return this.createSyntax(new ExpressionMaker(returnType, name, handler, patterns), handler, patterns);
     }
     
