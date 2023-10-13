@@ -11,6 +11,9 @@ import mx.kenzie.skriptlab.template.DirectExpression;
 import mx.kenzie.skriptlab.template.DirectPropertyCondition;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class SyntaxGenerator extends ClassLoader {
@@ -20,6 +23,21 @@ public class SyntaxGenerator extends ClassLoader {
     public SyntaxGenerator() {
         super(SyntaxGenerator.class.getClassLoader());
         this.generatedNumber = new AtomicInteger(0);
+    }
+    
+    /**
+     * Reads all special syntax annotations from a class and generates their syntax handlers.
+     *
+     * @param source the source class to read
+     * @return a collection of the unregistered syntax objects
+     */
+    public Collection<Syntax<?>> generateSyntaxFrom(Class<?> source) {
+        final List<Syntax<?>> list = new ArrayList<>();
+        final SyntaxExtractor extractor = new SyntaxExtractor(this);
+        extractor.prepare(source);
+        extractor.divine();
+        extractor.makeSyntax(list);
+        return list;
     }
     
     public Syntax<DirectEffect> createEffect(DirectEffect handler, String... patterns) {
