@@ -250,6 +250,7 @@ record ExpressionMaker(Class<?> returnType, String className, DirectExpression<?
 record DirectEffectMaker(String className, SyntaxExtractor.MaybeEffect effect, String... patterns) implements Maker {
     
     private static void get(MethodVisitor visitor, int index, Class<?> expected) {
+        //<editor-fold desc="Get expression value" defaultstate="collapsed">
         final boolean array = expected.isArray();
         visitor.visitVarInsn(ALOAD, 2);
         switch (index) {
@@ -262,6 +263,7 @@ record DirectEffectMaker(String className, SyntaxExtractor.MaybeEffect effect, S
         visitor.visitMethodInsn(INVOKEVIRTUAL, "mx/kenzie/skriptlab/Expressions", array ? "getArray" : "get",
             array ? "(I)[Ljava/lang/Object;" : "(I)Ljava/lang/Object;", false);
         visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(expected));
+        //</editor-fold>
     }
     
     static void writeCall(MethodVisitor visitor, Method method) {
@@ -369,6 +371,61 @@ record DirectConditionMaker(String className, SyntaxExtractor.MaybeCondition con
         DirectEffectMaker.writeCall(execute, condition.method);
         execute.visitInsn(IRETURN);
         execute.visitMaxs(Math.max(2, 1 + condition.method.getParameterCount() + (isDynamic ? 1 : 0)), 3);
+        execute.visitEnd();
+        //</editor-fold>
+        writer.visitEnd();
+        return writer.toByteArray();
+    }
+    
+}
+
+record DirectPropertyConditionMaker(String className, SyntaxExtractor.MaybePropertyCondition condition,
+                                    String pattern) implements Maker {
+    
+    @Override
+    public void close() {
+    }
+    
+    @Override
+    public byte[] generate() {
+        final String internalName = "mx/kenzie/skriptlab/generated/" + this.className();
+        final ClassWriter writer = new ClassWriter(0);
+        //<editor-fold desc="Class meta and fields" defaultstate="collapsed">
+        writer.visit(V17, ACC_PUBLIC | ACC_SUPER, internalName, null,
+            "java/lang/Record", new String[]{"mx/kenzie/skriptlab/template/DirectPropertyCondition"});
+        writer.visitRecordComponent("condition",
+            "Lmx/kenzie/skriptlab/annotation/PropertyCondition;", null).visitEnd();
+        writer.visitField(ACC_PRIVATE | ACC_FINAL, "condition",
+            "Lmx/kenzie/skriptlab/annotation/PropertyCondition;", null, null).visitEnd();
+        //</editor-fold>
+        //<editor-fold desc="Create empty constructor" defaultstate="collapsed">
+        final MethodVisitor constructor = writer.visitMethod(ACC_PUBLIC, "<init>",
+            "(Lmx/kenzie/skriptlab/annotation/PropertyCondition;)V",
+            null, null);
+        constructor.visitCode();
+        constructor.visitVarInsn(ALOAD, 0);
+        constructor.visitMethodInsn(INVOKESPECIAL, "java/lang/Record", "<init>", "()V", false);
+        constructor.visitVarInsn(ALOAD, 0);
+        constructor.visitVarInsn(ALOAD, 1);
+        constructor.visitFieldInsn(PUTFIELD, internalName, "condition",
+            "Lmx/kenzie/skriptlab/annotation/PropertyCondition;");
+        constructor.visitInsn(RETURN);
+        constructor.visitMaxs(2, 2);
+        constructor.visitEnd();
+        //</editor-fold>
+        //<editor-fold desc="Generate execute method" defaultstate="collapsed">
+        final Method method = condition.method;
+        final MethodVisitor execute = writer.visitMethod(ACC_PUBLIC, "check",
+            "(Ljava/lang/Object;)Z", null, null);
+        execute.visitCode();
+        final boolean isInterface = method.getDeclaringClass().isInterface();
+        final int opcode = isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL;
+        execute.visitVarInsn(ALOAD, 1);
+        execute.visitTypeInsn(CHECKCAST, Type.getInternalName(method.getDeclaringClass()));
+        execute.visitMethodInsn(opcode, Type.getInternalName(method.getDeclaringClass()),
+            method.getName(), Type.getMethodDescriptor(method), isInterface);
+        execute.visitInsn(IRETURN);
+        execute.visitMaxs(1, 2);
         execute.visitEnd();
         //</editor-fold>
         writer.visitEnd();

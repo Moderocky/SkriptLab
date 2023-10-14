@@ -2,11 +2,13 @@ package mx.kenzie.skriptlab;
 
 import mx.kenzie.skriptlab.annotation.Condition;
 import mx.kenzie.skriptlab.annotation.Effect;
+import mx.kenzie.skriptlab.annotation.PropertyCondition;
 import mx.kenzie.skriptlab.error.AbnormalSyntaxCreationError;
 import mx.kenzie.skriptlab.error.PatternCompatibilityException;
 import mx.kenzie.skriptlab.error.SyntaxCreationException;
 import mx.kenzie.skriptlab.template.DirectCondition;
 import mx.kenzie.skriptlab.template.DirectEffect;
+import mx.kenzie.skriptlab.template.DirectPropertyCondition;
 
 import java.lang.reflect.*;
 import java.util.HashSet;
@@ -35,27 +37,43 @@ public class SyntaxExtractor {
         for (final Method method : source.getMethods()) {
             this.divineEffect(method);
             this.divineCondition(method);
+            this.divinePropertyCondition(method);
         }
         //</editor-fold>
     }
     
-    protected void divineEffect(Method method) {
+    protected MaybeEffect divineEffect(Method method) {
         //<editor-fold desc="Make this method look like an effect" defaultstate="collapsed">
-        if (!method.isAnnotationPresent(Effect.class)) return;
+        if (!method.isAnnotationPresent(Effect.class)) return null;
         final MaybeEffect effect = new MaybeEffect(method, method.getAnnotation(Effect.class));
         effect.verify();
         this.syntax.add(effect);
         this.effects.add(effect);
+        return effect;
         //</editor-fold>
     }
     
-    protected void divineCondition(Method method) {
+    protected MaybeCondition divineCondition(Method method) {
         //<editor-fold desc="Make this method look like a condition" defaultstate="collapsed">
-        if (!method.isAnnotationPresent(Condition.class)) return;
+        if (!method.isAnnotationPresent(Condition.class)) return null;
         final MaybeCondition condition = new MaybeCondition(method, method.getAnnotation(Condition.class));
         condition.verify();
         this.syntax.add(condition);
         this.conditions.add(condition);
+        return condition;
+        //</editor-fold>
+    }
+    
+    protected MaybePropertyCondition divinePropertyCondition(Method method) {
+        //<editor-fold desc="Make this method look like a condition" defaultstate="collapsed">
+        if (Modifier.isStatic(method.getModifiers())) return null;
+        if (!method.isAnnotationPresent(PropertyCondition.class)) return null;
+        final MaybePropertyCondition condition = new MaybePropertyCondition(method,
+            method.getAnnotation(PropertyCondition.class));
+        condition.verify();
+        this.syntax.add(condition);
+        this.conditions.add(condition);
+        return condition;
         //</editor-fold>
     }
     
@@ -178,6 +196,56 @@ public class SyntaxExtractor {
                 throw new SyntaxCreationException("Unable to create syntax link.", ex);
             }
             return generator.createCondition(handler, patterns);
+            //</editor-fold>
+        }
+        
+    }
+    
+    protected class MaybePropertyCondition extends MaybeCondition {
+        
+        protected final Method method;
+        protected final PropertyCondition condition;
+        
+        protected MaybePropertyCondition(Method method, PropertyCondition condition) {
+            super(method, null);
+            this.method = method;
+            this.condition = condition;
+        }
+        
+        @Override
+        public void verify() throws PatternCompatibilityException {
+            //<editor-fold desc="Make sure the method is ok" defaultstate="collapsed">
+            if (method.getReturnType() != boolean.class)
+                throw new PatternCompatibilityException("Non-boolean return type for " + method);
+            if (Modifier.isStatic(method.getModifiers()))
+                throw new PatternCompatibilityException("Property condition " + method + " is static");
+            //</editor-fold>
+        }
+        
+        @Override
+        @SuppressWarnings({"unchecked", "RawUseOfParameterized"})
+        public Syntax<?> generate() throws AbnormalSyntaxCreationError, SyntaxCreationException {
+            //<editor-fold desc="Create a syntax that calls the method" defaultstate="collapsed">
+            final String className = "DirectPropertyCondition" + generator.nextClassIndex();
+            final String pattern;
+            if (condition.pattern().isBlank()) {
+                final String found = makePattern(method);
+                if (found.startsWith("is ")) pattern = found.substring(3).trim();
+                else if (found.startsWith("has ")
+                    || found.startsWith("was ")
+                    || found.startsWith("can ")) pattern = found.substring(4).trim();
+                else pattern = found.trim();
+            } else pattern = condition.pattern().trim();
+            final DirectPropertyCondition handler;
+            try (final Maker maker = new DirectPropertyConditionMaker(className, this, pattern)) {
+                final Class<?> type = maker.make(generator);
+                final Object object = type.getDeclaredConstructor(PropertyCondition.class).newInstance(condition);
+                assert object instanceof DirectPropertyCondition;
+                handler = (DirectPropertyCondition) object;
+            } catch (Exception ex) {
+                throw new SyntaxCreationException("Unable to create syntax link.", ex);
+            }
+            return generator.createPropertyCondition(handler, (Class) method.getDeclaringClass(), pattern);
             //</editor-fold>
         }
         
