@@ -53,6 +53,19 @@ public class SyntaxExtractorTest {
         assert extractor.syntax.size() == 1;
     }
     
+    @Test
+    public void makeSyntaxCheckName() throws Exception {
+        final SyntaxExtractor extractor = new SyntaxExtractor(new SyntaxGenerator());
+        extractor.prepare(Dummy.class);
+        extractor.divineCondition(Dummy.class.getMethod("isItWorking"));
+        assert extractor.syntax.size() == 1;
+        final SyntaxExtractor.MaybeSyntax maybe = extractor.syntax.iterator().next();
+        maybe.verify();
+        final Syntax<?> syntax = maybe.generate();
+        assert syntax.patterns().length == 1;
+        assert syntax.patterns()[0].equals("is it working");
+    }
+    
     @Test(expected = PatternCompatibilityException.class)
     public void makeConditionNoBooleanReturn() throws Exception {
         final SyntaxExtractor extractor = new SyntaxExtractor(new SyntaxGenerator());
@@ -69,7 +82,7 @@ public class SyntaxExtractorTest {
         }
         
         @Condition
-        public static boolean working() {
+        public static boolean isItWorking() {
             return true;
         }
         

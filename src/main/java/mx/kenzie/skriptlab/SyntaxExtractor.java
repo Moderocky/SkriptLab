@@ -8,9 +8,7 @@ import mx.kenzie.skriptlab.error.SyntaxCreationException;
 import mx.kenzie.skriptlab.template.DirectCondition;
 import mx.kenzie.skriptlab.template.DirectEffect;
 
-import java.lang.reflect.AnnotatedElement;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
+import java.lang.reflect.*;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -66,7 +64,10 @@ public class SyntaxExtractor {
     }
     
     protected String makePattern(AnnotatedElement member) {
-        if (member instanceof Method method) return method.getName(); // todo
+        if (member instanceof Method method) return new PatternCreator(method.getName()).getPattern();
+        else if (member instanceof Field field) return new PatternCreator(field.getName()).getPattern();
+        else if (member instanceof Constructor<?> thing) return new PatternCreator(thing.getName()).getPattern();
+        else if (member instanceof Class<?> type) return new PatternCreator(type.getSimpleName()).getPattern();
         else throw new SyntaxCreationException("Unable to invent a pattern for " + member);
     }
     
