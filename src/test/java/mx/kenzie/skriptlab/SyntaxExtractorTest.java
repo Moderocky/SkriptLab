@@ -2,6 +2,7 @@ package mx.kenzie.skriptlab;
 
 import mx.kenzie.skriptlab.annotation.Condition;
 import mx.kenzie.skriptlab.annotation.Effect;
+import mx.kenzie.skriptlab.annotation.PropertyCondition;
 import mx.kenzie.skriptlab.error.PatternCompatibilityException;
 import org.junit.Test;
 
@@ -33,7 +34,7 @@ public class SyntaxExtractorTest {
         extractor.divine();
         assert !extractor.syntax.isEmpty();
         assert extractor.effects.size() == 2;
-        assert extractor.conditions.size() == 1;
+        assert extractor.conditions.size() == 2;
     }
     
     @Test
@@ -64,6 +65,13 @@ public class SyntaxExtractorTest {
         final Syntax<?> syntax = maybe.generate();
         assert syntax.patterns().length == 1;
         assert syntax.patterns()[0].equals("is it working");
+        final SyntaxExtractor.MaybePropertyCondition property = extractor.divinePropertyCondition(
+            Dummy.class.getMethod("isOkay"));
+        assert extractor.syntax.size() == 2;
+        final Syntax<?> generated = property.generate();
+        assert generated.patterns().length == 2;
+        assert generated.patterns()[0].equals("%dummy% (is|are) okay") : generated.patterns()[0];
+        assert generated.patterns()[1].equals("%dummy% (isn't|is not|aren't|are not) okay") : generated.patterns()[1];
     }
     
     @Test(expected = PatternCompatibilityException.class)
@@ -89,6 +97,11 @@ public class SyntaxExtractorTest {
         @Effect("test %object%")
         public void test() {
             System.out.println("test");
+        }
+        
+        @PropertyCondition
+        public boolean isOkay() {
+            return true;
         }
         
     }
