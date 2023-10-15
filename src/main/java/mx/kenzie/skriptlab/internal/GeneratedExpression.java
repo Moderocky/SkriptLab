@@ -1,5 +1,6 @@
 package mx.kenzie.skriptlab.internal;
 
+import ch.njol.skript.classes.Changer;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser;
 import ch.njol.skript.lang.util.SimpleExpression;
@@ -10,6 +11,7 @@ import mx.kenzie.skriptlab.error.AbnormalSyntaxCreationError;
 import mx.kenzie.skriptlab.template.DirectExpression;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class GeneratedExpression<Type> extends SimpleExpression<Type> {
     
@@ -55,6 +57,13 @@ public class GeneratedExpression<Type> extends SimpleExpression<Type> {
     @Override
     public @NotNull Class<? extends Type> getReturnType() {
         return handle.getReturnType();
+    }
+    
+    @Override
+    public Class<?> @Nullable [] acceptChange(Changer.@NotNull ChangeMode mode) {
+        final Class<?>[] changers = handle.acceptChange(mode);
+        if (changers == DirectExpression.noChangers) return super.acceptChange(mode);
+        return changers;
     }
     
 }
