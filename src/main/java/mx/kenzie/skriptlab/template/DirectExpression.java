@@ -27,6 +27,9 @@ public interface DirectExpression<Type> extends Direct {
         return noChangers;
     }
     
+    default void change(@NotNull Event event, Object[] delta, Changer.ChangeMode mode) {
+    }
+    
     interface Single<Type> extends DirectExpression<Type> {
         
         @Override
