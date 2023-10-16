@@ -96,10 +96,10 @@ public class SyntaxExtractor {
         final String[] patterns = this.makePattern(method, expression.value());
         for (final MaybeExpression maybe : expressions) {
             if (!Arrays.equals(maybe.pattern, patterns)) continue;
-            if (maybe.changers.containsKey(mode))
-                throw new PatternCompatibilityException("Expression `" +
-                    patterns[0] + "` already has a " + mode + " accessor.");
+            if (maybe.changers.containsKey(mode)) throw new PatternCompatibilityException(
+                "Expression `" + patterns[0] + "` already has a " + mode + " accessor.");
             maybe.changers.put(mode, new MaybeExpression.Pair(method, expression));
+            return maybe;
         }
         return new MaybeExpression(method, expression);
     }
@@ -263,9 +263,8 @@ public class SyntaxExtractor {
             if (condition.pattern().isBlank()) {
                 final String found = makePattern(method);
                 if (found.startsWith("is ")) pattern = found.substring(3).trim();
-                else if (found.startsWith("has ")
-                    || found.startsWith("was ")
-                    || found.startsWith("can ")) pattern = found.substring(4).trim();
+                else if (found.startsWith("has ") || found.startsWith("was ") || found.startsWith("can "))
+                    pattern = found.substring(4).trim();
                 else pattern = found.trim();
             } else pattern = condition.pattern().trim();
             final DirectPropertyCondition handler;
@@ -290,7 +289,7 @@ public class SyntaxExtractor {
         protected Pair base;
         
         protected MaybeExpression(Method method, Expression expression) {
-            this.pattern = expression.value();
+            this.pattern = makePattern(method, expression.value());
             this.changers.put(expression.mode(), new Pair(method, expression));
         }
         
@@ -305,8 +304,8 @@ public class SyntaxExtractor {
                 if (Modifier.isStatic(method.getModifiers())) expectedInputs = method.getParameterCount();
                 else expectedInputs = method.getParameterCount() + 1;
                 if (mode == AccessMode.GET) {
-                    if (method.getReturnType() == void.class) throw new PatternCompatibilityException(
-                        "No value is returned from getter " + method);
+                    if (method.getReturnType() == void.class)
+                        throw new PatternCompatibilityException("No value is returned from getter " + method);
                     for (final String string : pattern) {
                         final PatternDigest digest = new PatternDigest(string);
                         digest.digest();
@@ -316,9 +315,10 @@ public class SyntaxExtractor {
                             "Pattern `" + string + "` has too many inputs to invoke " + method);
                     }
                 } else {
-                    if (mode.expectArguments && expectedInputs < 2) throw new PatternCompatibilityException(
-                        mode + " handler has no input parameter in " + method);
-                    else if ((mode.expectArguments && expectedInputs > 2) || expectedInputs > 1)
+                    final boolean needsSource = !Modifier.isStatic(method.getModifiers());
+                    if (needsSource && mode.expectArguments && expectedInputs < 2)
+                        throw new PatternCompatibilityException(mode + " handler has no input parameter in " + method);
+                    else if ((mode.expectArguments && expectedInputs > 2) || (!mode.expectArguments && expectedInputs > 1))
                         throw new PatternCompatibilityException(
                             mode + " handler has too many input parameters in " + method);
                     if (mode.expectReturn && method.getReturnType() == void.class)

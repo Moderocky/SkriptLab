@@ -36,8 +36,7 @@ interface Maker extends Closeable {
         final MethodVisitor constructor = writer.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
         constructor.visitCode();
         constructor.visitVarInsn(ALOAD, 0);
-        constructor.visitMethodInsn(INVOKESPECIAL, internalName, "<init>",
-            "()V", false);
+        constructor.visitMethodInsn(INVOKESPECIAL, internalName, "<init>", "()V", false);
         constructor.visitInsn(RETURN);
         constructor.visitMaxs(1, 1);
         constructor.visitEnd();
@@ -49,8 +48,7 @@ interface Maker extends Closeable {
         final MethodVisitor getPatterns = writer.visitMethod(ACC_PUBLIC, "getPatterns", "()[Ljava/lang/String;", null,
             null);
         getPatterns.visitCode();
-        getPatterns.visitFieldInsn(GETSTATIC, internalName, "patterns",
-            "[Ljava/lang/String;");
+        getPatterns.visitFieldInsn(GETSTATIC, internalName, "patterns", "[Ljava/lang/String;");
         getPatterns.visitInsn(ARETURN);
         getPatterns.visitMaxs(1, 1);
         getPatterns.visitEnd();
@@ -70,12 +68,11 @@ record ConditionMaker(String className, DirectCondition handler, String... patte
         final String internalName = "mx/kenzie/skriptlab/generated/" + this.className();
         final ClassWriter writer = new ClassWriter(0);
         //<editor-fold desc="Class meta and fields" defaultstate="collapsed">
-        writer.visit(V17, ACC_PUBLIC | ACC_SUPER, internalName, null,
-            "mx/kenzie/skriptlab/internal/GeneratedCondition", null);
-        writer.visitField(ACC_PUBLIC | ACC_STATIC, "handle",
-            "Lmx/kenzie/skriptlab/template/DirectCondition;", null, null).visitEnd();
-        writer.visitField(ACC_PUBLIC | ACC_STATIC, "patterns", "[Ljava/lang/String;", null,
+        writer.visit(V17, ACC_PUBLIC | ACC_SUPER, internalName, null, "mx/kenzie/skriptlab/internal/GeneratedCondition",
+            null);
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "handle", "Lmx/kenzie/skriptlab/template/DirectCondition;", null,
             null).visitEnd();
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "patterns", "[Ljava/lang/String;", null, null).visitEnd();
         //</editor-fold>
         //<editor-fold desc="Create empty constructor" defaultstate="collapsed">
         this.addConstructor("mx/kenzie/skriptlab/internal/GeneratedCondition", writer);
@@ -84,8 +81,7 @@ record ConditionMaker(String className, DirectCondition handler, String... patte
         final MethodVisitor getHandle = writer.visitMethod(ACC_PUBLIC, "getHandle",
             "()Lmx/kenzie/skriptlab/template/DirectCondition;", null, null);
         getHandle.visitCode();
-        getHandle.visitFieldInsn(GETSTATIC, internalName, "handle",
-            "Lmx/kenzie/skriptlab/template/DirectCondition;");
+        getHandle.visitFieldInsn(GETSTATIC, internalName, "handle", "Lmx/kenzie/skriptlab/template/DirectCondition;");
         getHandle.visitInsn(ARETURN);
         getHandle.visitMaxs(1, 1);
         getHandle.visitEnd();
@@ -112,8 +108,8 @@ record PropertyConditionMaker(String className, DirectPropertyCondition<?> handl
         //<editor-fold desc="Class meta and fields" defaultstate="collapsed">
         writer.visit(V17, ACC_PUBLIC | ACC_SUPER, internalName, null,
             "mx/kenzie/skriptlab/internal/GeneratedPropertyCondition", null);
-        writer.visitField(ACC_PUBLIC | ACC_STATIC, "handle",
-            "Lmx/kenzie/skriptlab/template/DirectPropertyCondition;", null, null).visitEnd();
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "handle", "Lmx/kenzie/skriptlab/template/DirectPropertyCondition;",
+            null, null).visitEnd();
         //</editor-fold>
         //<editor-fold desc="Create empty constructor" defaultstate="collapsed">
         this.addConstructor("mx/kenzie/skriptlab/internal/GeneratedPropertyCondition", writer);
@@ -154,12 +150,11 @@ record EffectMaker(String className, DirectEffect handler, String... patterns) i
         final String internalName = "mx/kenzie/skriptlab/generated/" + this.className();
         final ClassWriter writer = new ClassWriter(0);
         //<editor-fold desc="Class meta and fields" defaultstate="collapsed">
-        writer.visit(V17, ACC_PUBLIC | ACC_SUPER, internalName, null,
-            "mx/kenzie/skriptlab/internal/GeneratedEffect", null);
-        writer.visitField(ACC_PUBLIC | ACC_STATIC, "handle",
-            "Lmx/kenzie/skriptlab/template/DirectEffect;", null, null).visitEnd();
-        writer.visitField(ACC_PUBLIC | ACC_STATIC, "patterns", "[Ljava/lang/String;", null,
-            null).visitEnd();
+        writer.visit(V17, ACC_PUBLIC | ACC_SUPER, internalName, null, "mx/kenzie/skriptlab/internal/GeneratedEffect",
+            null);
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "handle", "Lmx/kenzie/skriptlab/template/DirectEffect;", null, null)
+            .visitEnd();
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "patterns", "[Ljava/lang/String;", null, null).visitEnd();
         //</editor-fold>
         //<editor-fold desc="Create empty constructor" defaultstate="collapsed">
         this.addConstructor("mx/kenzie/skriptlab/internal/GeneratedEffect", writer);
@@ -168,8 +163,7 @@ record EffectMaker(String className, DirectEffect handler, String... patterns) i
         final MethodVisitor getHandle = writer.visitMethod(ACC_PUBLIC, "getHandle",
             "()Lmx/kenzie/skriptlab/template/DirectEffect;", null, null);
         getHandle.visitCode();
-        getHandle.visitFieldInsn(GETSTATIC, internalName, "handle",
-            "Lmx/kenzie/skriptlab/template/DirectEffect;");
+        getHandle.visitFieldInsn(GETSTATIC, internalName, "handle", "Lmx/kenzie/skriptlab/template/DirectEffect;");
         getHandle.visitInsn(ARETURN);
         getHandle.visitMaxs(1, 1);
         getHandle.visitEnd();
@@ -197,10 +191,9 @@ record ExpressionMaker(Class<?> returnType, String className, DirectExpression<?
         //<editor-fold desc="Class meta and fields" defaultstate="collapsed">
         writer.visit(V17, ACC_PUBLIC | ACC_SUPER, internalName, null,
             "mx/kenzie/skriptlab/internal/GeneratedExpression", null);
-        writer.visitField(ACC_PUBLIC | ACC_STATIC, "handle",
-            "Lmx/kenzie/skriptlab/template/DirectExpression;", null, null).visitEnd();
-        writer.visitField(ACC_PUBLIC | ACC_STATIC, "patterns", "[Ljava/lang/String;", null,
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "handle", "Lmx/kenzie/skriptlab/template/DirectExpression;", null,
             null).visitEnd();
+        writer.visitField(ACC_PUBLIC | ACC_STATIC, "patterns", "[Ljava/lang/String;", null, null).visitEnd();
         //</editor-fold>
         //<editor-fold desc="Create empty constructor" defaultstate="collapsed">
         this.addConstructor("mx/kenzie/skriptlab/internal/GeneratedExpression", writer);
@@ -209,8 +202,7 @@ record ExpressionMaker(Class<?> returnType, String className, DirectExpression<?
         final MethodVisitor getHandle = writer.visitMethod(ACC_PUBLIC, "getHandle",
             "()Lmx/kenzie/skriptlab/template/DirectExpression;", null, null);
         getHandle.visitCode();
-        getHandle.visitFieldInsn(GETSTATIC, internalName, "handle",
-            "Lmx/kenzie/skriptlab/template/DirectExpression;");
+        getHandle.visitFieldInsn(GETSTATIC, internalName, "handle", "Lmx/kenzie/skriptlab/template/DirectExpression;");
         getHandle.visitInsn(ARETURN);
         getHandle.visitMaxs(1, 1);
         getHandle.visitEnd();
@@ -219,16 +211,13 @@ record ExpressionMaker(Class<?> returnType, String className, DirectExpression<?
         this.addPatternsMethod(internalName, writer);
         //</editor-fold>
         //<editor-fold desc="Generate getReturnType method" defaultstate="collapsed">
-        final MethodVisitor getReturnType = writer.visitMethod(ACC_PUBLIC, "getReturnType", "()Ljava/lang/Class;",
-            null,
+        final MethodVisitor getReturnType = writer.visitMethod(ACC_PUBLIC, "getReturnType", "()Ljava/lang/Class;", null,
             null);
         getReturnType.visitCode();
         getReturnType.visitVarInsn(ALOAD, 0);
-        getReturnType.visitMethodInsn(INVOKEVIRTUAL, "mx/kenzie/skriptlab/generated/" + this.className(),
-            "getHandle",
+        getReturnType.visitMethodInsn(INVOKEVIRTUAL, "mx/kenzie/skriptlab/generated/" + this.className(), "getHandle",
             "()Lmx/kenzie/skriptlab/template/DirectExpression;", false);
-        getReturnType.visitMethodInsn(INVOKEINTERFACE, "mx/kenzie/skriptlab/template/DirectExpression",
-            "getReturnType",
+        getReturnType.visitMethodInsn(INVOKEINTERFACE, "mx/kenzie/skriptlab/template/DirectExpression", "getReturnType",
             "()Ljava/lang/Class;", true);
         getReturnType.visitVarInsn(ASTORE, 1); // the user might have provided a return type
         getReturnType.visitVarInsn(ALOAD, 1);
@@ -269,16 +258,15 @@ record DirectEffectMaker(String className, SyntaxExtractor.MaybeEffect effect, S
     }
     
     static void writeCall(MethodVisitor visitor, Method method) {
-        final boolean isInterface = method.getDeclaringClass().isInterface(),
-            isDynamic = !Modifier.isStatic(method.getModifiers());
+        final boolean isInterface = method.getDeclaringClass().isInterface(), isDynamic = !Modifier.isStatic(
+            method.getModifiers());
         int index = 0;
-        if (isDynamic)
-            DirectEffectMaker.get(visitor, index++, method.getDeclaringClass());
+        if (isDynamic) DirectEffectMaker.get(visitor, index++, method.getDeclaringClass());
         for (final Class<?> type : method.getParameterTypes())
             DirectEffectMaker.get(visitor, index++, type);
         final int opcode = !isDynamic ? INVOKESTATIC : isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL;
-        visitor.visitMethodInsn(opcode, Type.getInternalName(method.getDeclaringClass()),
-            method.getName(), Type.getMethodDescriptor(method), isInterface);
+        visitor.visitMethodInsn(opcode, Type.getInternalName(method.getDeclaringClass()), method.getName(),
+            Type.getMethodDescriptor(method), isInterface);
     }
     
     @Override
@@ -290,24 +278,21 @@ record DirectEffectMaker(String className, SyntaxExtractor.MaybeEffect effect, S
         final String internalName = "mx/kenzie/skriptlab/generated/" + this.className();
         final ClassWriter writer = new ClassWriter(0);
         //<editor-fold desc="Class meta and fields" defaultstate="collapsed">
-        writer.visit(V17, ACC_PUBLIC | ACC_SUPER, internalName, null,
-            "java/lang/Record", new String[]{"mx/kenzie/skriptlab/template/DirectEffect"});
-        writer.visitRecordComponent("effect",
-            "Lmx/kenzie/skriptlab/annotation/Effect;", null).visitEnd();
-        writer.visitField(ACC_PRIVATE | ACC_FINAL, "effect",
-            "Lmx/kenzie/skriptlab/annotation/Effect;", null, null).visitEnd();
+        writer.visit(V17, ACC_PUBLIC | ACC_SUPER, internalName, null, "java/lang/Record",
+            new String[]{"mx/kenzie/skriptlab/template/DirectEffect"});
+        writer.visitRecordComponent("effect", "Lmx/kenzie/skriptlab/annotation/Effect;", null).visitEnd();
+        writer.visitField(ACC_PRIVATE | ACC_FINAL, "effect", "Lmx/kenzie/skriptlab/annotation/Effect;", null, null)
+            .visitEnd();
         //</editor-fold>
         //<editor-fold desc="Create empty constructor" defaultstate="collapsed">
         final MethodVisitor constructor = writer.visitMethod(ACC_PUBLIC, "<init>",
-            "(Lmx/kenzie/skriptlab/annotation/Effect;)V",
-            null, null);
+            "(Lmx/kenzie/skriptlab/annotation/Effect;)V", null, null);
         constructor.visitCode();
         constructor.visitVarInsn(ALOAD, 0);
         constructor.visitMethodInsn(INVOKESPECIAL, "java/lang/Record", "<init>", "()V", false);
         constructor.visitVarInsn(ALOAD, 0);
         constructor.visitVarInsn(ALOAD, 1);
-        constructor.visitFieldInsn(PUTFIELD, internalName, "effect",
-            "Lmx/kenzie/skriptlab/annotation/Effect;");
+        constructor.visitFieldInsn(PUTFIELD, internalName, "effect", "Lmx/kenzie/skriptlab/annotation/Effect;");
         constructor.visitInsn(RETURN);
         constructor.visitMaxs(2, 2);
         constructor.visitEnd();
@@ -343,24 +328,21 @@ record DirectConditionMaker(String className, SyntaxExtractor.MaybeCondition con
         final String internalName = "mx/kenzie/skriptlab/generated/" + this.className();
         final ClassWriter writer = new ClassWriter(0);
         //<editor-fold desc="Class meta and fields" defaultstate="collapsed">
-        writer.visit(V17, ACC_PUBLIC | ACC_SUPER, internalName, null,
-            "java/lang/Record", new String[]{"mx/kenzie/skriptlab/template/DirectCondition"});
-        writer.visitRecordComponent("condition",
-            "Lmx/kenzie/skriptlab/annotation/Condition;", null).visitEnd();
-        writer.visitField(ACC_PRIVATE | ACC_FINAL, "condition",
-            "Lmx/kenzie/skriptlab/annotation/Condition;", null, null).visitEnd();
+        writer.visit(V17, ACC_PUBLIC | ACC_SUPER, internalName, null, "java/lang/Record",
+            new String[]{"mx/kenzie/skriptlab/template/DirectCondition"});
+        writer.visitRecordComponent("condition", "Lmx/kenzie/skriptlab/annotation/Condition;", null).visitEnd();
+        writer.visitField(ACC_PRIVATE | ACC_FINAL, "condition", "Lmx/kenzie/skriptlab/annotation/Condition;", null,
+            null).visitEnd();
         //</editor-fold>
         //<editor-fold desc="Create empty constructor" defaultstate="collapsed">
         final MethodVisitor constructor = writer.visitMethod(ACC_PUBLIC, "<init>",
-            "(Lmx/kenzie/skriptlab/annotation/Condition;)V",
-            null, null);
+            "(Lmx/kenzie/skriptlab/annotation/Condition;)V", null, null);
         constructor.visitCode();
         constructor.visitVarInsn(ALOAD, 0);
         constructor.visitMethodInsn(INVOKESPECIAL, "java/lang/Record", "<init>", "()V", false);
         constructor.visitVarInsn(ALOAD, 0);
         constructor.visitVarInsn(ALOAD, 1);
-        constructor.visitFieldInsn(PUTFIELD, internalName, "condition",
-            "Lmx/kenzie/skriptlab/annotation/Condition;");
+        constructor.visitFieldInsn(PUTFIELD, internalName, "condition", "Lmx/kenzie/skriptlab/annotation/Condition;");
         constructor.visitInsn(RETURN);
         constructor.visitMaxs(2, 2);
         constructor.visitEnd();
@@ -393,17 +375,15 @@ record DirectPropertyConditionMaker(String className, SyntaxExtractor.MaybePrope
         final String internalName = "mx/kenzie/skriptlab/generated/" + this.className();
         final ClassWriter writer = new ClassWriter(0);
         //<editor-fold desc="Class meta and fields" defaultstate="collapsed">
-        writer.visit(V17, ACC_PUBLIC | ACC_SUPER, internalName, null,
-            "java/lang/Record", new String[]{"mx/kenzie/skriptlab/template/DirectPropertyCondition"});
-        writer.visitRecordComponent("condition",
-            "Lmx/kenzie/skriptlab/annotation/PropertyCondition;", null).visitEnd();
-        writer.visitField(ACC_PRIVATE | ACC_FINAL, "condition",
-            "Lmx/kenzie/skriptlab/annotation/PropertyCondition;", null, null).visitEnd();
+        writer.visit(V17, ACC_PUBLIC | ACC_SUPER, internalName, null, "java/lang/Record",
+            new String[]{"mx/kenzie/skriptlab/template/DirectPropertyCondition"});
+        writer.visitRecordComponent("condition", "Lmx/kenzie/skriptlab/annotation/PropertyCondition;", null).visitEnd();
+        writer.visitField(ACC_PRIVATE | ACC_FINAL, "condition", "Lmx/kenzie/skriptlab/annotation/PropertyCondition;",
+            null, null).visitEnd();
         //</editor-fold>
         //<editor-fold desc="Create empty constructor" defaultstate="collapsed">
         final MethodVisitor constructor = writer.visitMethod(ACC_PUBLIC, "<init>",
-            "(Lmx/kenzie/skriptlab/annotation/PropertyCondition;)V",
-            null, null);
+            "(Lmx/kenzie/skriptlab/annotation/PropertyCondition;)V", null, null);
         constructor.visitCode();
         constructor.visitVarInsn(ALOAD, 0);
         constructor.visitMethodInsn(INVOKESPECIAL, "java/lang/Record", "<init>", "()V", false);
@@ -417,15 +397,14 @@ record DirectPropertyConditionMaker(String className, SyntaxExtractor.MaybePrope
         //</editor-fold>
         //<editor-fold desc="Generate execute method" defaultstate="collapsed">
         final Method method = condition.method;
-        final MethodVisitor execute = writer.visitMethod(ACC_PUBLIC, "check",
-            "(Ljava/lang/Object;)Z", null, null);
+        final MethodVisitor execute = writer.visitMethod(ACC_PUBLIC, "check", "(Ljava/lang/Object;)Z", null, null);
         execute.visitCode();
         final boolean isInterface = method.getDeclaringClass().isInterface();
         final int opcode = isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL;
         execute.visitVarInsn(ALOAD, 1);
         execute.visitTypeInsn(CHECKCAST, Type.getInternalName(method.getDeclaringClass()));
-        execute.visitMethodInsn(opcode, Type.getInternalName(method.getDeclaringClass()),
-            method.getName(), Type.getMethodDescriptor(method), isInterface);
+        execute.visitMethodInsn(opcode, Type.getInternalName(method.getDeclaringClass()), method.getName(),
+            Type.getMethodDescriptor(method), isInterface);
         execute.visitInsn(IRETURN);
         execute.visitMaxs(1, 2);
         execute.visitEnd();
@@ -457,16 +436,15 @@ record DirectExpressionMaker(String className, SyntaxExtractor.MaybeExpression e
     }
     
     static void writeCall(MethodVisitor visitor, Method method) {
-        final boolean isInterface = method.getDeclaringClass().isInterface(),
-            isDynamic = !Modifier.isStatic(method.getModifiers());
+        final boolean isInterface = method.getDeclaringClass().isInterface(), isDynamic = !Modifier.isStatic(
+            method.getModifiers());
         int index = 0;
-        if (isDynamic)
-            DirectExpressionMaker.get(visitor, index++, method.getDeclaringClass());
+        if (isDynamic) DirectExpressionMaker.get(visitor, index++, method.getDeclaringClass());
         for (final Class<?> type : method.getParameterTypes())
             DirectExpressionMaker.get(visitor, index++, type);
         final int opcode = !isDynamic ? INVOKESTATIC : isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL;
-        visitor.visitMethodInsn(opcode, Type.getInternalName(method.getDeclaringClass()),
-            method.getName(), Type.getMethodDescriptor(method), isInterface);
+        visitor.visitMethodInsn(opcode, Type.getInternalName(method.getDeclaringClass()), method.getName(),
+            Type.getMethodDescriptor(method), isInterface);
     }
     
     private static void wrapPrimitiveNumber(MethodVisitor method, Class<?> result) {
@@ -478,6 +456,45 @@ record DirectExpressionMaker(String className, SyntaxExtractor.MaybeExpression e
             method.visitMethodInsn(INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;", false);
         else if (result == double.class)
             method.visitMethodInsn(INVOKESTATIC, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;", false);
+    }
+    
+    static void writeChangeCall(String internalName, MethodVisitor visitor, AccessMode mode, Method method) {
+        //<editor-fold desc="Call the change method using the delta" defaultstate="collapsed">
+        final boolean isInterface = method.getDeclaringClass().isInterface(), isDynamic = !Modifier.isStatic(
+            method.getModifiers());
+        final Class<?> source;
+        if (isDynamic) source = method.getDeclaringClass();
+        else if (method.getParameterCount() == 0) source = null;
+        else source = method.getParameterTypes()[0];
+        if (source != null) { // if this is an expression relating to something
+            visitor.visitVarInsn(ALOAD, 1);
+            visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(source));
+        }
+        if (mode.expectArguments) { // if we're setting or adding
+            final Class<?> input = method.getParameterTypes()[method.getParameterCount() - 1];
+            if (input.isArray()) {
+                visitor.visitVarInsn(ALOAD, 0);
+                visitor.visitLdcInsn(Type.getType(input.getComponentType()));
+                visitor.visitVarInsn(ALOAD, 2);
+                visitor.visitMethodInsn(INVOKEVIRTUAL, internalName, "getArray",
+                    "(Ljava/lang/Class;[Ljava/lang/Object;)[Ljava/lang/Object;", false);
+                visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(input));
+            } else {
+                visitor.visitVarInsn(ALOAD, 0);
+                visitor.visitLdcInsn(Type.getType(input));
+                visitor.visitVarInsn(ALOAD, 2);
+                visitor.visitMethodInsn(INVOKEVIRTUAL, internalName, "getSingle",
+                    "(Ljava/lang/Class;[Ljava/lang/Object;)Ljava/lang/Object;", false);
+                visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(input));
+            }
+        }
+        final int opcode = !isDynamic ? INVOKESTATIC : isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL;
+        visitor.visitMethodInsn(opcode, Type.getInternalName(method.getDeclaringClass()), method.getName(),
+            Type.getMethodDescriptor(method), isInterface);
+        final Class<?> result = method.getReturnType();
+        if (result == double.class || result == long.class) visitor.visitInsn(POP2);
+        else if (result != void.class) visitor.visitInsn(POP);
+        //</editor-fold>
     }
     
     @Override
@@ -495,25 +512,21 @@ record DirectExpressionMaker(String className, SyntaxExtractor.MaybeExpression e
         final Class<?> result = get.getReturnType();
         final boolean single = !result.isArray(); // we use the single version to pack an array
         //<editor-fold desc="Class meta and fields" defaultstate="collapsed">
-        writer.visit(V17, ACC_PUBLIC | ACC_SUPER, internalName, null,
-            "java/lang/Record",
+        writer.visit(V17, ACC_PUBLIC | ACC_SUPER, internalName, null, "java/lang/Record",
             new String[]{"mx/kenzie/skriptlab/template/DirectExpression" + (single ? "$Single" : "")});
-        writer.visitRecordComponent("expression",
-            "Lmx/kenzie/skriptlab/annotation/Expression;", null).visitEnd();
-        writer.visitField(ACC_PRIVATE | ACC_FINAL, "expression",
-            "Lmx/kenzie/skriptlab/annotation/Expression;", null, null).visitEnd();
+        writer.visitRecordComponent("expression", "Lmx/kenzie/skriptlab/annotation/Expression;", null).visitEnd();
+        writer.visitField(ACC_PRIVATE | ACC_FINAL, "expression", "Lmx/kenzie/skriptlab/annotation/Expression;", null,
+            null).visitEnd();
         //</editor-fold>
         //<editor-fold desc="Create empty constructor" defaultstate="collapsed">
         final MethodVisitor constructor = writer.visitMethod(ACC_PUBLIC, "<init>",
-            "(Lmx/kenzie/skriptlab/annotation/Expression;)V",
-            null, null);
+            "(Lmx/kenzie/skriptlab/annotation/Expression;)V", null, null);
         constructor.visitCode();
         constructor.visitVarInsn(ALOAD, 0);
         constructor.visitMethodInsn(INVOKESPECIAL, "java/lang/Record", "<init>", "()V", false);
         constructor.visitVarInsn(ALOAD, 0);
         constructor.visitVarInsn(ALOAD, 1);
-        constructor.visitFieldInsn(PUTFIELD, internalName, "expression",
-            "Lmx/kenzie/skriptlab/annotation/Expression;");
+        constructor.visitFieldInsn(PUTFIELD, internalName, "expression", "Lmx/kenzie/skriptlab/annotation/Expression;");
         constructor.visitInsn(RETURN);
         constructor.visitMaxs(2, 2);
         constructor.visitEnd();
@@ -532,8 +545,7 @@ record DirectExpressionMaker(String className, SyntaxExtractor.MaybeExpression e
             //</editor-fold>
             //<editor-fold desc="Create array type getter" defaultstate="collapsed">
             final MethodVisitor getArrayType = writer.visitMethod(ACC_PUBLIC | ACC_BRIDGE | ACC_SYNTHETIC,
-                "getArrayType",
-                "([Ljava/lang/Object;)Ljava/lang/Class;", null, null);
+                "getArrayType", "([Ljava/lang/Object;)Ljava/lang/Class;", null, null);
             getArrayType.visitCode();
             getArrayType.visitLdcInsn(Type.getType(Object.class));
             getArrayType.visitInsn(ARETURN);
@@ -550,6 +562,64 @@ record DirectExpressionMaker(String className, SyntaxExtractor.MaybeExpression e
             getArray.visitInsn(ARETURN);
             getArray.visitMaxs(Math.max(2, 1 + get.getParameterCount() + (isDynamic ? 1 : 0)), 3);
             getArray.visitEnd();
+            //</editor-fold>
+        }
+        if (!changers.isEmpty()) {
+            //<editor-fold desc="Create acceptChange method" defaultstate="collapsed">
+            final MethodVisitor acceptChange = writer.visitMethod(ACC_PUBLIC | ACC_BRIDGE | ACC_SYNTHETIC,
+                "acceptChange", "(Lch/njol/skript/classes/Changer$ChangeMode;)[Ljava/lang/Class;", null, null);
+            acceptChange.visitCode();
+            for (final Map.Entry<AccessMode, SyntaxExtractor.MaybeExpression.Pair> entry : changers.entrySet()) {
+                //<editor-fold desc="Check type for accessor" defaultstate="collapsed">
+                final AccessMode mode = entry.getKey();
+                final SyntaxExtractor.MaybeExpression.Pair pair = entry.getValue();
+                final Method method = pair.method();
+                acceptChange.visitVarInsn(ALOAD, 1);
+                acceptChange.visitFieldInsn(GETSTATIC, "ch/njol/skript/classes/Changer$ChangeMode", mode.name(),
+                    "Lch/njol/skript/classes/Changer$ChangeMode;");
+                final Label not = new Label();
+                acceptChange.visitJumpInsn(IF_ACMPNE, not);
+                if (mode.expectArguments) { // we want to accept a certain type
+                    acceptChange.visitInsn(ICONST_1);
+                    acceptChange.visitTypeInsn(ANEWARRAY, "java/lang/Class");
+                    acceptChange.visitInsn(DUP);
+                    acceptChange.visitInsn(ICONST_0);
+                    acceptChange.visitLdcInsn(Type.getType(method.getParameterTypes()[method.getParameterCount() - 1]));
+                    acceptChange.visitInsn(AASTORE);
+                } else { // allow this but with no inputs (e.g. DELETE)
+                    acceptChange.visitInsn(ICONST_0);
+                    acceptChange.visitTypeInsn(ANEWARRAY, "java/lang/Class");
+                }
+                acceptChange.visitInsn(ARETURN);
+                acceptChange.visitLabel(not);
+                acceptChange.visitFrame(F_SAME, 0, null, 0, null);
+                //</editor-fold>
+            }
+            acceptChange.visitInsn(ACONST_NULL); // changer isn't supported :(
+            acceptChange.visitInsn(ARETURN);
+            acceptChange.visitMaxs(4, 2);
+            acceptChange.visitEnd();
+            //</editor-fold>
+            //<editor-fold desc="Create change method" defaultstate="collapsed">
+            final MethodVisitor change = writer.visitMethod(ACC_PUBLIC, "change",
+                "(Ljava/lang/Object;[Ljava/lang/Object;Lch/njol/skript/classes/Changer$ChangeMode;)V", null, null);
+            change.visitCode();
+            for (final Map.Entry<AccessMode, SyntaxExtractor.MaybeExpression.Pair> entry : changers.entrySet()) {
+                final AccessMode mode = entry.getKey();
+                final SyntaxExtractor.MaybeExpression.Pair pair = entry.getValue();
+                final Method method = pair.method();
+                change.visitVarInsn(ALOAD, 3);
+                change.visitFieldInsn(GETSTATIC, "ch/njol/skript/classes/Changer$ChangeMode", mode.name(),
+                    "Lch/njol/skript/classes/Changer$ChangeMode;");
+                final Label next = new Label();
+                change.visitJumpInsn(IF_ACMPNE, next);
+                DirectExpressionMaker.writeChangeCall(internalName, change, mode, method);
+                change.visitLabel(next);
+                change.visitFrame(F_SAME, 0, null, 0, null);
+            }
+            change.visitInsn(RETURN);
+            change.visitMaxs(4, 4);
+            change.visitEnd();
             //</editor-fold>
         }
         writer.visitEnd();
