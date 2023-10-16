@@ -95,6 +95,19 @@ public class SyntaxExtractorTest {
         assert generate != null;
     }
     
+    @Test
+    public void makeExpressionChangers() throws Exception {
+        final SyntaxExtractor extractor = new SyntaxExtractor(new SyntaxGenerator());
+        extractor.prepare(Dummy.class);
+        extractor.divineExpression(Dummy.class.getMethod("testExpression", String.class));
+        SyntaxExtractor.MaybeExpression test = extractor.divineExpression(
+            Dummy.class.getMethod("testExpression"));
+        assert extractor.syntax.size() == 1 : extractor.syntax.size();
+        test.verify();
+        final Syntax<?> generate = test.generate();
+        assert generate != null;
+    }
+    
     public static class Dummy {
         
         @Effect("print %string%")
@@ -117,9 +130,14 @@ public class SyntaxExtractorTest {
             return true;
         }
         
-        @Expression("%object%'s test")
+        @Expression("%thing%'s test")
         public String testExpression() {
             return "hello";
+        }
+        
+        @Expression(value = "%thing%'s test", mode = AccessMode.SET)
+        public void testExpression(String value) {
+        
         }
         
         @Expression("%object%'s testing")
