@@ -70,7 +70,7 @@ public class GeneratedExpression<Type> extends SimpleExpression<Type> {
     public void change(@NotNull Event event, Object @Nullable [] delta, Changer.@NotNull ChangeMode mode) {
         final Class<?>[] changers = handle.acceptChange(mode);
         if (changers == DirectExpression.noChangers) super.change(event, delta, mode);
-        else handle.change(event, delta, mode);
+        else handle.change(this.getSingle(event), delta, mode);
     }
     
 }
