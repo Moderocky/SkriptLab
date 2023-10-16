@@ -12,6 +12,8 @@ import org.objectweb.asm.Type;
 import java.io.Closeable;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.objectweb.asm.Opcodes.*;
 
@@ -428,6 +430,128 @@ record DirectPropertyConditionMaker(String className, SyntaxExtractor.MaybePrope
         execute.visitMaxs(1, 2);
         execute.visitEnd();
         //</editor-fold>
+        writer.visitEnd();
+        return writer.toByteArray();
+    }
+    
+}
+
+record DirectExpressionMaker(String className, SyntaxExtractor.MaybeExpression expression,
+                             String... patterns) implements Maker {
+    
+    private static void get(MethodVisitor visitor, int index, Class<?> expected) {
+        //<editor-fold desc="Get expression value" defaultstate="collapsed">
+        final boolean array = expected.isArray();
+        visitor.visitVarInsn(ALOAD, 2);
+        switch (index) {
+            case 0 -> visitor.visitInsn(ICONST_0);
+            case 1 -> visitor.visitInsn(ICONST_1);
+            case 2 -> visitor.visitInsn(ICONST_2);
+            case 3 -> visitor.visitInsn(ICONST_3);
+            default -> visitor.visitIntInsn(BIPUSH, index);
+        }
+        visitor.visitMethodInsn(INVOKEVIRTUAL, "mx/kenzie/skriptlab/Expressions", array ? "getArray" : "get",
+            array ? "(I)[Ljava/lang/Object;" : "(I)Ljava/lang/Object;", false);
+        visitor.visitTypeInsn(CHECKCAST, Type.getInternalName(expected));
+        //</editor-fold>
+    }
+    
+    static void writeCall(MethodVisitor visitor, Method method) {
+        final boolean isInterface = method.getDeclaringClass().isInterface(),
+            isDynamic = !Modifier.isStatic(method.getModifiers());
+        int index = 0;
+        if (isDynamic)
+            DirectExpressionMaker.get(visitor, index++, method.getDeclaringClass());
+        for (final Class<?> type : method.getParameterTypes())
+            DirectExpressionMaker.get(visitor, index++, type);
+        final int opcode = !isDynamic ? INVOKESTATIC : isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL;
+        visitor.visitMethodInsn(opcode, Type.getInternalName(method.getDeclaringClass()),
+            method.getName(), Type.getMethodDescriptor(method), isInterface);
+    }
+    
+    private static void wrapPrimitiveNumber(MethodVisitor method, Class<?> result) {
+        if (result == int.class)
+            method.visitMethodInsn(INVOKESTATIC, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;", false);
+        else if (result == float.class)
+            method.visitMethodInsn(INVOKESTATIC, "java/lang/Float", "valueOf", "(F)Ljava/lang/Float;", false);
+        else if (result == long.class)
+            method.visitMethodInsn(INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;", false);
+        else if (result == double.class)
+            method.visitMethodInsn(INVOKESTATIC, "java/lang/Double", "valueOf", "(D)Ljava/lang/Double;", false);
+    }
+    
+    @Override
+    public void close() {
+    }
+    
+    @Override
+    public byte[] generate() {
+        final String internalName = "mx/kenzie/skriptlab/generated/" + this.className();
+        final ClassWriter writer = new ClassWriter(0);
+        final Map<AccessMode, SyntaxExtractor.MaybeExpression.Pair> changers = new HashMap<>(expression.changers);
+        final SyntaxExtractor.MaybeExpression.Pair getter = changers.remove(AccessMode.GET);
+        assert getter != null;
+        final Method get = getter.method();
+        final Class<?> result = get.getReturnType();
+        final boolean single = !result.isArray(); // we use the single version to pack an array
+        //<editor-fold desc="Class meta and fields" defaultstate="collapsed">
+        writer.visit(V17, ACC_PUBLIC | ACC_SUPER, internalName, null,
+            "java/lang/Record",
+            new String[]{"mx/kenzie/skriptlab/template/DirectExpression" + (single ? "$Single" : "")});
+        writer.visitRecordComponent("expression",
+            "Lmx/kenzie/skriptlab/annotation/Expression;", null).visitEnd();
+        writer.visitField(ACC_PRIVATE | ACC_FINAL, "expression",
+            "Lmx/kenzie/skriptlab/annotation/Expression;", null, null).visitEnd();
+        //</editor-fold>
+        //<editor-fold desc="Create empty constructor" defaultstate="collapsed">
+        final MethodVisitor constructor = writer.visitMethod(ACC_PUBLIC, "<init>",
+            "(Lmx/kenzie/skriptlab/annotation/Expression;)V",
+            null, null);
+        constructor.visitCode();
+        constructor.visitVarInsn(ALOAD, 0);
+        constructor.visitMethodInsn(INVOKESPECIAL, "java/lang/Record", "<init>", "()V", false);
+        constructor.visitVarInsn(ALOAD, 0);
+        constructor.visitVarInsn(ALOAD, 1);
+        constructor.visitFieldInsn(PUTFIELD, internalName, "expression",
+            "Lmx/kenzie/skriptlab/annotation/Expression;");
+        constructor.visitInsn(RETURN);
+        constructor.visitMaxs(2, 2);
+        constructor.visitEnd();
+        //</editor-fold>
+        final boolean isDynamic = !Modifier.isStatic(getter.method().getModifiers());
+        if (single) {
+            //<editor-fold desc="Generate getSingle method" defaultstate="collapsed">
+            final MethodVisitor getSingle = writer.visitMethod(ACC_PUBLIC, "getSingle",
+                "(Lorg/bukkit/event/Event;Lmx/kenzie/skriptlab/Expressions;)Ljava/lang/Object;", null, null);
+            getSingle.visitCode();
+            DirectExpressionMaker.writeCall(getSingle, get);
+            DirectExpressionMaker.wrapPrimitiveNumber(getSingle, result);
+            getSingle.visitInsn(ARETURN);
+            getSingle.visitMaxs(Math.max(2, 1 + get.getParameterCount() + (isDynamic ? 1 : 0)), 3);
+            getSingle.visitEnd();
+            //</editor-fold>
+            //<editor-fold desc="Create array type getter" defaultstate="collapsed">
+            final MethodVisitor getArrayType = writer.visitMethod(ACC_PUBLIC | ACC_BRIDGE | ACC_SYNTHETIC,
+                "getArrayType",
+                "([Ljava/lang/Object;)Ljava/lang/Class;", null, null);
+            getArrayType.visitCode();
+            getArrayType.visitLdcInsn(Type.getType(Object.class));
+            getArrayType.visitInsn(ARETURN);
+            getArrayType.visitMaxs(1, 2);
+            getArrayType.visitEnd();
+            //</editor-fold>
+        } else {
+            //<editor-fold desc="Generate get method" defaultstate="collapsed">
+            final MethodVisitor getArray = writer.visitMethod(ACC_PUBLIC, "get",
+                "(Lorg/bukkit/event/Event;Lmx/kenzie/skriptlab/Expressions;)[Ljava/lang/Object;", null, null);
+            getArray.visitCode();
+            DirectExpressionMaker.writeCall(getArray, get);
+            getArray.visitTypeInsn(CHECKCAST, "[Ljava/lang/Object;");
+            getArray.visitInsn(ARETURN);
+            getArray.visitMaxs(Math.max(2, 1 + get.getParameterCount() + (isDynamic ? 1 : 0)), 3);
+            getArray.visitEnd();
+            //</editor-fold>
+        }
         writer.visitEnd();
         return writer.toByteArray();
     }

@@ -44,7 +44,7 @@ public interface DirectExpression<Type> extends Direct {
         Type getSingle(@NotNull Event event, Expressions inputs);
         
         @SuppressWarnings("unchecked")
-        private Class<Type> getArrayType(Type... array) {
+        default Class<Type> getArrayType(Type... array) {
             return (Class<Type>) array.getClass().getComponentType();
         }
         

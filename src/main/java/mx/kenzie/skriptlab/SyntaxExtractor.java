@@ -2,18 +2,18 @@ package mx.kenzie.skriptlab;
 
 import mx.kenzie.skriptlab.annotation.Condition;
 import mx.kenzie.skriptlab.annotation.Effect;
+import mx.kenzie.skriptlab.annotation.Expression;
 import mx.kenzie.skriptlab.annotation.PropertyCondition;
 import mx.kenzie.skriptlab.error.AbnormalSyntaxCreationError;
 import mx.kenzie.skriptlab.error.PatternCompatibilityException;
 import mx.kenzie.skriptlab.error.SyntaxCreationException;
 import mx.kenzie.skriptlab.template.DirectCondition;
 import mx.kenzie.skriptlab.template.DirectEffect;
+import mx.kenzie.skriptlab.template.DirectExpression;
 import mx.kenzie.skriptlab.template.DirectPropertyCondition;
 
 import java.lang.reflect.*;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class SyntaxExtractor {
     
@@ -22,6 +22,7 @@ public class SyntaxExtractor {
     protected Set<MaybeSyntax> syntax;
     protected Set<MaybeEffect> effects;
     protected Set<MaybeCondition> conditions;
+    protected Set<MaybeExpression> expressions;
     
     protected SyntaxExtractor(SyntaxGenerator generator) {this.generator = generator;}
     
@@ -30,6 +31,7 @@ public class SyntaxExtractor {
         this.syntax = new HashSet<>();
         this.effects = new HashSet<>();
         this.conditions = new HashSet<>();
+        this.expressions = new HashSet<>();
     }
     
     public void divine() throws PatternCompatibilityException {
@@ -38,6 +40,7 @@ public class SyntaxExtractor {
             this.divineEffect(method);
             this.divineCondition(method);
             this.divinePropertyCondition(method);
+            this.divineExpression(method);
         }
         //</editor-fold>
     }
@@ -77,8 +80,37 @@ public class SyntaxExtractor {
         //</editor-fold>
     }
     
+    protected MaybeExpression divineExpression(Method method) {
+        //<editor-fold desc="Make this method look like an expression" defaultstate="collapsed">
+        if (!method.isAnnotationPresent(Expression.class)) return null;
+        final MaybeExpression expression = this.getExpression(method, method.getAnnotation(Expression.class));
+        expression.verify();
+        this.syntax.add(expression);
+        this.expressions.add(expression);
+        return expression;
+        //</editor-fold>
+    }
+    
+    private MaybeExpression getExpression(Method method, Expression expression) {
+        final AccessMode mode = expression.mode();
+        final String[] patterns = this.makePattern(method, expression.value());
+        for (final MaybeExpression maybe : expressions) {
+            if (!Arrays.equals(maybe.pattern, patterns)) continue;
+            if (maybe.changers.containsKey(mode))
+                throw new PatternCompatibilityException("Expression `" +
+                    patterns[0] + "` already has a " + mode + " accessor.");
+            maybe.changers.put(mode, new MaybeExpression.Pair(method, expression));
+        }
+        return new MaybeExpression(method, expression);
+    }
+    
     public void makeSyntax(List<Syntax<?>> list) {
         for (final MaybeSyntax syntax : syntax) list.add(syntax.generate());
+    }
+    
+    protected String[] makePattern(AnnotatedElement member, String... alternate) {
+        if (alternate != null && alternate.length > 0) return alternate;
+        return new String[]{this.makePattern(member)};
     }
     
     protected String makePattern(AnnotatedElement member) {
@@ -248,6 +280,78 @@ public class SyntaxExtractor {
             return generator.createPropertyCondition(handler, (Class) method.getDeclaringClass(), pattern);
             //</editor-fold>
         }
+        
+    }
+    
+    protected class MaybeExpression implements MaybeSyntax {
+        
+        protected final String[] pattern;
+        protected final Map<AccessMode, Pair> changers = new HashMap<>();
+        protected Pair base;
+        
+        protected MaybeExpression(Method method, Expression expression) {
+            this.pattern = expression.value();
+            this.changers.put(expression.mode(), new Pair(method, expression));
+        }
+        
+        @Override
+        public void verify() throws PatternCompatibilityException {
+            //<editor-fold desc="Make sure patterns have right %inputs% for method" defaultstate="collapsed">
+            for (final Map.Entry<AccessMode, Pair> entry : changers.entrySet()) {
+                final Pair value = entry.getValue();
+                final Method method = value.method;
+                final AccessMode mode = entry.getKey();
+                final int expectedInputs;
+                if (Modifier.isStatic(method.getModifiers())) expectedInputs = method.getParameterCount();
+                else expectedInputs = method.getParameterCount() + 1;
+                if (mode == AccessMode.GET) {
+                    if (method.getReturnType() == void.class) throw new PatternCompatibilityException(
+                        "No value is returned from getter " + method);
+                    for (final String string : pattern) {
+                        final PatternDigest digest = new PatternDigest(string);
+                        digest.digest();
+                        if (expectedInputs > digest.getInputs()) throw new PatternCompatibilityException(
+                            "Pattern `" + string + "` has too few inputs to invoke " + method);
+                        if (expectedInputs < digest.getInputs()) throw new PatternCompatibilityException(
+                            "Pattern `" + string + "` has too many inputs to invoke " + method);
+                    }
+                } else {
+                    if (mode.expectArguments && expectedInputs < 2) throw new PatternCompatibilityException(
+                        mode + " handler has no input parameter in " + method);
+                    else if ((mode.expectArguments && expectedInputs > 2) || expectedInputs > 1)
+                        throw new PatternCompatibilityException(
+                            mode + " handler has too many input parameters in " + method);
+                    if (mode.expectReturn && method.getReturnType() == void.class)
+                        throw new PatternCompatibilityException(
+                            "No value is returned from " + mode + " handler " + method);
+                }
+            }
+            //</editor-fold>
+        }
+        
+        @Override
+        @SuppressWarnings({"unchecked", "RawUseOfParameterized"})
+        public Syntax<?> generate() throws AbnormalSyntaxCreationError, SyntaxCreationException {
+            //<editor-fold desc="Create a syntax that calls the method" defaultstate="collapsed">
+            this.base = changers.get(AccessMode.GET);
+            if (base == null)
+                throw new SyntaxCreationException("No getter was provided for expression `" + pattern[0] + "`");
+            final String className = "DirectExpression" + generator.nextClassIndex();
+            final Class returnType = base.method.getReturnType();
+            final DirectExpression handler;
+            try (final Maker maker = new DirectExpressionMaker(className, this, pattern)) {
+                final Class<?> type = maker.make(generator);
+                final Object object = type.getDeclaredConstructor(Expression.class).newInstance(base.meta);
+                assert object instanceof DirectExpression;
+                handler = (DirectExpression) object;
+            } catch (Exception ex) {
+                throw new SyntaxCreationException("Unable to create syntax link.", ex);
+            }
+            return generator.createExpression(returnType, handler, pattern);
+            //</editor-fold>
+        }
+        
+        protected record Pair(Method method, Expression meta) {}
         
     }
     
