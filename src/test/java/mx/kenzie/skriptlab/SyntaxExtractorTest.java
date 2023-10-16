@@ -2,6 +2,7 @@ package mx.kenzie.skriptlab;
 
 import mx.kenzie.skriptlab.annotation.Condition;
 import mx.kenzie.skriptlab.annotation.Effect;
+import mx.kenzie.skriptlab.annotation.Expression;
 import mx.kenzie.skriptlab.annotation.PropertyCondition;
 import mx.kenzie.skriptlab.error.PatternCompatibilityException;
 import org.junit.Test;
@@ -82,6 +83,18 @@ public class SyntaxExtractorTest {
         assert extractor.syntax.size() == 1;
     }
     
+    @Test
+    public void makeExpressionSingle() throws Exception {
+        final SyntaxExtractor extractor = new SyntaxExtractor(new SyntaxGenerator());
+        extractor.prepare(Dummy.class);
+        SyntaxExtractor.MaybeExpression test = extractor.divineExpression(
+            Dummy.class.getMethod("testExpression"));
+        assert extractor.syntax.size() == 1;
+        test.verify();
+        final Syntax<?> generate = test.generate();
+        assert generate != null;
+    }
+    
     public static class Dummy {
         
         @Effect("print %string%")
@@ -102,6 +115,16 @@ public class SyntaxExtractorTest {
         @PropertyCondition
         public boolean isOkay() {
             return true;
+        }
+        
+        @Expression("%object%'s test")
+        public String testExpression() {
+            return "hello";
+        }
+        
+        @Expression("%object%'s testing")
+        public String[] testExpression2() {
+            return new String[]{"hello", "there"};
         }
         
     }
