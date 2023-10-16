@@ -5,6 +5,7 @@ import mx.kenzie.skriptlab.Expressions;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.skriptlang.skript.lang.converter.Converters;
 
 import java.lang.reflect.Array;
 
@@ -27,7 +28,18 @@ public interface DirectExpression<Type> extends Direct {
         return noChangers;
     }
     
-    default void change(@NotNull Event event, Object[] delta, Changer.ChangeMode mode) {
+    default void change(Object source, Object[] delta, Changer.ChangeMode mode) {
+    }
+    
+    default <Thing> Thing getSingle(Class<Thing> type, Object... delta) {
+        if (delta == null || delta.length < 1) return null;
+        return Converters.convert(delta[0], type);
+    }
+    
+    @SuppressWarnings("unchecked")
+    default <Thing> Thing[] getArray(Class<Thing> type, Object... delta) {
+        if (delta == null || delta.length < 1) return (Thing[]) Array.newInstance(type, 0);
+        return Converters.convert(delta, type);
     }
     
     interface Single<Type> extends DirectExpression<Type> {
