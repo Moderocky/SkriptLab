@@ -1,9 +1,6 @@
 package mx.kenzie.skriptlab;
 
-import mx.kenzie.skriptlab.annotation.Condition;
-import mx.kenzie.skriptlab.annotation.Effect;
-import mx.kenzie.skriptlab.annotation.Expression;
-import mx.kenzie.skriptlab.annotation.PropertyCondition;
+import mx.kenzie.skriptlab.annotation.*;
 import mx.kenzie.skriptlab.error.PatternCompatibilityException;
 import org.junit.Test;
 
@@ -75,6 +72,21 @@ public class SyntaxExtractorTest {
         assert generated.patterns()[1].equals("%dummy% (isn't|is not|aren't|are not) okay") : generated.patterns()[1];
     }
     
+    @Test
+    public void makeSyntaxPropertyName() throws Exception {
+        final SyntaxExtractor extractor = new SyntaxExtractor(new SyntaxGenerator());
+        extractor.prepare(Dummy.class);
+        extractor.divinePropertyExpression(Dummy.class.getMethod("name"));
+        final SyntaxExtractor.MaybeExpression maybe = extractor.divinePropertyExpression(
+            Dummy.class.getMethod("setName", String.class));
+        assert extractor.syntax.size() == 1;
+        maybe.verify();
+        final Syntax<?> syntax = maybe.generate();
+        assert syntax.patterns().length == 2;
+        assert syntax.patterns()[0].equals("[the] name of %dummy%") : syntax.patterns()[0];
+        assert syntax.patterns()[1].equals("%dummy%'[s] name") : syntax.patterns()[1];
+    }
+    
     @Test(expected = PatternCompatibilityException.class)
     public void makeConditionNoBooleanReturn() throws Exception {
         final SyntaxExtractor extractor = new SyntaxExtractor(new SyntaxGenerator());
@@ -118,6 +130,15 @@ public class SyntaxExtractorTest {
         @Condition
         public static boolean isItWorking() {
             return true;
+        }
+        
+        @PropertyExpression
+        public String name() {
+            return "hello";
+        }
+        
+        @PropertyExpression(value = "name", mode = AccessMode.SET)
+        public void setName(String name) {
         }
         
         @Effect("test %object%")
