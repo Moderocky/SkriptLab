@@ -1,9 +1,6 @@
 package mx.kenzie.skriptlab;
 
-import mx.kenzie.skriptlab.annotation.Condition;
-import mx.kenzie.skriptlab.annotation.Effect;
-import mx.kenzie.skriptlab.annotation.Expression;
-import mx.kenzie.skriptlab.annotation.PropertyCondition;
+import mx.kenzie.skriptlab.annotation.*;
 import mx.kenzie.skriptlab.error.AbnormalSyntaxCreationError;
 import mx.kenzie.skriptlab.error.PatternCompatibilityException;
 import mx.kenzie.skriptlab.error.SyntaxCreationException;
@@ -41,6 +38,7 @@ public class SyntaxExtractor {
             this.divineCondition(method);
             this.divinePropertyCondition(method);
             this.divineExpression(method);
+            this.divinePropertyExpression(method);
         }
         //</editor-fold>
     }
@@ -84,6 +82,21 @@ public class SyntaxExtractor {
         //<editor-fold desc="Make this method look like an expression" defaultstate="collapsed">
         if (!method.isAnnotationPresent(Expression.class)) return null;
         final MaybeExpression expression = this.getExpression(method, method.getAnnotation(Expression.class));
+        expression.verify();
+        this.syntax.add(expression);
+        this.expressions.add(expression);
+        return expression;
+        //</editor-fold>
+    }
+    
+    protected MaybeExpression divinePropertyExpression(Method method) {
+        //<editor-fold desc="Make this method look like an expression" defaultstate="collapsed">
+        if (!method.isAnnotationPresent(PropertyExpression.class)) return null;
+        if (Modifier.isStatic(method.getModifiers()))
+            throw new PatternCompatibilityException("Property expressions can't be generated from static methods.");
+        final PropertyExpression initial = method.getAnnotation(PropertyExpression.class);
+        final Expression meta = Expression.Converted.converted(initial, method);
+        final MaybeExpression expression = this.getExpression(method, meta);
         expression.verify();
         this.syntax.add(expression);
         this.expressions.add(expression);

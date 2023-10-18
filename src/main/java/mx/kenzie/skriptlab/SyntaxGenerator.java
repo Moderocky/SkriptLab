@@ -25,6 +25,16 @@ public class SyntaxGenerator extends ClassLoader {
         this.generatedNumber = new AtomicInteger(0);
     }
     
+    public static String getTypeName(Class<?> holder) {
+        try {
+            final ClassInfo<?> info = Classes.getSuperClassInfo(holder);
+            if (info == null) return holder.getSimpleName().toLowerCase();
+            return info.getCodeName();
+        } catch (IllegalStateException ex) {
+            return holder.getSimpleName().toLowerCase(); // test only?
+        }
+    }
+    
     protected int nextClassIndex() {
         return generatedNumber.incrementAndGet();
     }
@@ -60,10 +70,7 @@ public class SyntaxGenerator extends ClassLoader {
     
     public <Type> Syntax<DirectPropertyCondition<Type>> createPropertyCondition(DirectPropertyCondition<Type> handler, Class<Type> holder, String property, PropertyCondition.PropertyType propertyType) {
         final String name = "GeneratedCondition" + this.nextClassIndex();
-        final ClassInfo<?> info = Classes.getExactClassInfo(holder); // we do our best if this isn't registered yet
-        final String type;
-        if (info == null) type = holder.getSimpleName().toLowerCase();
-        else type = info.getCodeName();
+        final String type = getTypeName(holder);
         final String pattern, negated;
         pattern = switch (propertyType) {
             case BE -> "%" + type + "% (is|are) " + property;

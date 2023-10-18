@@ -1,11 +1,11 @@
 package mx.kenzie.skriptlab.annotation;
 
 import mx.kenzie.skriptlab.AccessMode;
+import mx.kenzie.skriptlab.PatternCreator;
+import mx.kenzie.skriptlab.SyntaxGenerator;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import java.lang.annotation.*;
+import java.lang.reflect.Method;
 
 /**
  * Generates a Skript expression from a method.
@@ -24,5 +24,27 @@ public @interface Expression {
     String[] value() default {};
     
     AccessMode mode() default AccessMode.GET;
+    
+    record Converted(AccessMode mode, String... value) implements Expression {
+        
+        public static Expression converted(PropertyExpression expression, Method method) {
+            final String[] values = new String[2];
+            final String value = expression.value(), property, fromType;
+            if (value.isBlank()) {
+                final PatternCreator creator = new PatternCreator(method.getName());
+                property = creator.getPattern();
+            } else property = value;
+            fromType = SyntaxGenerator.getTypeName(method.getDeclaringClass());
+            values[0] = "[the] " + property + " of %" + fromType + "%";
+            values[1] = "%" + fromType + "%'[s] " + property;
+            return new Converted(expression.mode(), values);
+        }
+        
+        @Override
+        public Class<? extends Annotation> annotationType() {
+            return Expression.class;
+        }
+        
+    }
     
 }
