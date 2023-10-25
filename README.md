@@ -5,139 +5,122 @@ An automatic syntax-creation library for Skript addons.
 
 ### Introduction
 
-The original version of this resource was an experiment in my Mask library to be able to auto-generate Skript syntax at runtime using only annotations.
+The original version of this resource was an experiment in my Mask library to be able to auto-generate Skript syntax at
+runtime using only annotations.
 
-Skript's syntax classes require a large amount of boilerplate that, for the majority of cases, ends up being cookie-cutter work, which is slow, tedious and largely unnecessary for creating simple wrappers.
-This will deter many plugins from adding their own native Skript support, leading to the creation of addons dedicated entirely to providing syntax for one or two plugins, or a group of similar plugins. (See regions addon, permissions addon, holograms addon, etc.)
+Skript's syntax classes require a large amount of boilerplate that, for the majority of cases, ends up being
+cookie-cutter work, which is slow, tedious and largely unnecessary for creating simple wrappers.
+This will deter many plugins from adding their own native Skript support, leading to the creation of addons dedicated
+entirely to providing syntax for one or two plugins, or a group of similar plugins. (See regions addon, permissions
+addon, holograms addon, etc.)
 
-In an ideal world, it would be up to the plugin creator to add their own Skript support, but it is very understandable why they would not want to.
+In an ideal world, it would be up to the plugin creator to add their own Skript support, but it is very understandable
+why they would not want to.
 
 SkriptLab aims to solve this through the following goals:
- - To provide a simple and minimalist way to add Skript syntax
- - To generate syntax that is comparable in speed and quality to hand-written syntax classes
- - To provide a lightweight dependency
- - To avoid excess garbage and memory pollution
+
+- To provide a simple and minimalist way to add Skript syntax
+- To generate syntax that is comparable in speed and quality to hand-written syntax classes
+- To provide a lightweight dependency
+- To avoid excess garbage and memory pollution
+
+Every Skript syntax requires its own class. This makes anonymous runtime generation problematic, since the programmer
+might not know what classes are required.
+
+To overcome this problem, SkriptLab compiles individual syntax classes to suit the program's needs while it is running.
+These are assigned to a child classloader, and can be disposed of or replaced as needed.
 
 ### Maven Information
 
 ```xml
+
 <repository>
-    <id>pan-repo</id>
-    <name>Pandaemonium Repository</name>
-    <url>https://gitlab.com/api/v4/projects/18568066/packages/maven</url>
+    <id>kenzie</id>
+    <url>https://repo.kenzie.mx/releases</url>
 </repository>
 ``` 
 
 ```xml
+
 <dependency>
     <groupId>mx.kenzie</groupId>
     <artifactId>skriptlab</artifactId>
-    <version>1.0.2</version>
+    <version>2.0.0</version>
     <scope>compile</scope>
 </dependency>
 ```
 
-### Usage
+## Usage
 
-SkriptLab is accessed through a series of five basic annotations.
+### Syntax Generation
 
-|Name|Target|Usage|
-|----|------|-----|
-|Effect|Method (void)|A runnable Skript effect. Inputs are passed to the method parameters. If used on a dynamic method, the first input is assumed to be the object.|
-|Condition|Method (boolean)|A condition. Inputs are passed to the method parameters. If used on a dynamic method, the first input is assumed to be the object.|
-|Expression|Method (any non-null)|An expression that returns a value. Inputs are passed to the method parameters. If used on a dynamic method, the first input is assumed to be the object.|
-|Property|Field (any) / Methods|An expression of the type `the X of Y` or `Y's X` where X is the property name and Y is the object. This may be used only on dynamic fields. Primitives and number types are automatically wrapped.|
-|SkriptType|Class|Registers the given object class as a Skript Type, allowing it to be used in syntax.|
+Syntax is created through a `SyntaxGenerator`. This is a reusable controller object that holds on to all the generated
+syntax information.
+This also holds the class loader in which syntax elements are bootstrapped, so once the syntax generator object is
+discarded the syntax classes can also be garbage collected (providing they are unregistered and no longer in use).
 
-The `Documentation` annotation can be used in conjunction with `SkriptType` to provide extra details for Skript's automatic user documentation generation. This is not necessary, and the type alone is all that is required for simple registration. 
+The generator has two uses:
 
-These annotations are designed to be unobtrusive and easy to add into a plugin's existing code without requiring any changes or extra classes to be created.
+To make full syntax classes out of patterns and simple functional interfaces.
 
-SkriptLab will attempt to generate sensible and legible syntax automatically based on the method/field/class name, but this can be manually overridden (such as when inputs are required) with the annotation value.
+```java 
+final Syntax syntax = generator.createCondition((event, inputs) -> {
+    final String text = inputs.get(0);
+    return text.isBlank();
+}, "%text% is blank");
+// syntax.register();
+```
 
-A very basic example of use can be seen below.
+To generate syntax classes from annotations on members.
 
-```java
-@SkriptType("elephant")
-public class Elephant {
+```java 
+
+@Type
+public class Elephant { // %elephant%
     
     @Expression("[a] new elephant")
-    public static Elephant create() {
+    public static Elephant create() { // set {_var} to a new elephant
         return new Elephant();
     }
     
-    @Property("abcd")
-    private double value = 10.0;
-    
-    @Condition
-    boolean isChonky() { return true; }
-    
-    @Condition
-    public boolean hasEars() { return true; }
-    
-    @Effect("make %elephant% eat leaves")
-    public void eat() {
-        System.out.println("I'm eating leaves :)");
+    @PropertyCondition
+    public boolean isOkay() { // if {_var} is okay:
+        return true;
     }
+    
+    @PropertyExpression
+    public double trunkLength() { // {_var}'s trunk length
+        return 5;
+    }
+    
+    @PropertyExpression(mode = AccessMode.SET)
+    public void trunkLength(Number length) { // set {_var}'s trunk length to 10
+        // ...
+    }
+    
+    @PropertyExpression(mode = AccessMode.ADD, value = "trunk length")
+    public void trunkLength(Number length) { // add 2 to {_var}'s trunk length
+        // ...
+    }
+
 }
 ```
 
-This would automatically generate the following:
- - Expression `[a] new elephant`
- - Property `([the] abcd of %elephant%|%elephant%'s abcd)`
- - Condition `%elephant% is chonky` (and the inverse)
- - Condition `%elephant% has ears` (and the inverse)
- - Effect `make %elephant% eat leaves`
+### Annotations
 
-In order to register the syntax, your plugin may keep a `SyntaxGenerator` instance. This is best done in your plugin class (for easy access and disposal) but can be done anywhere.
+SkriptLab is accessed through a series of five basic annotations.
 
-A very simple example is below.
+| Name               | Target                | Usage                                                                                                                                                     |
+|--------------------|-----------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Effect             | Method                | A runnable Skript effect. Inputs are passed to the method parameters. If used on a dynamic method, the first input is assumed to be the object.           |
+| Condition          | Method (boolean)      | A condition. Inputs are passed to the method parameters. If used on a dynamic method, the first input is assumed to be the object.                        |
+| PropertyCondition  | Method (boolean)      | A shortcut for creating simple conditions of the type `X is alive`                                                                                        |
+| Expression         | Method (any non-null) | An expression that returns a value. Inputs are passed to the method parameters. If used on a dynamic method, the first input is assumed to be the object. |
+| PropertyExpression | Methods               | An expression of the type `the X of Y` or `Y's X` where X is the property name and Y is the object. Multiple methods can be used for each access mode.    |
+| Type               | Class                 | Registers the given object class as a Skript Type, allowing it to be used in syntax.                                                                      |
 
-```java
-public class ExamplePlugin extends JavaPlugin {
-    private SyntaxGenerator generator;
-    
-    @Override
-    public void onEnable() {
-        generator = new SyntaxGenerator(this);
-        generator.registerSyntaxFrom(MyClass.class, Elephant.class, AnotherClass.class);
-    }
-    
-    @Override
-    public void onDisable() {
-        generator = null;
-    }
-}
-```
+These annotations are designed to be unobtrusive and easy to add into a plugin's existing code without requiring any
+changes or extra classes to be created.
 
-The `SyntaxGenerator#registerSyntaxFrom` method accepts an array of classes, and will automatically scour them for annotations and deal with them.
-If Skript is not on the server (or otherwise non-functional) the `new SyntaxGenerator` constructor will throw an `IllegalStateException`.
-
-The registration method can throw exceptions with error details if a problem was encountered while creating or loading the syntax classes.
-
-**Note:** It is very important to annul all instances of your `SyntaxGenerator` once your plugin is disabled. This will automatically remove the generated classes from memory to prevent a memory leak and pollution - if you want to get rid of your SyntaxGenerator instance as soon as registration is done this should also be fine as Skript will keep the individual syntax classes in memory for you.
-
-Generated syntax classes cannot be recycled currently.
-
-### Design Choices
-
-The original version of SkriptLab (lovingly named `skript-experiment-3`) used a system of local classes and abstraction to create the syntax classes.
-
-While this was easier, in the sense that all code was present at compile-time, it caused some issues with registration as the constructors of local classes have several oddities and are in a strange state between public and explicitly private, which caused several headaches.
-
-Instead of this approach, SkriptLab writes the bytecode for the syntax classes at runtime and loads them using a custom classloader which is a child of your plugin's classloader for accessibility.
-This approach is significantly more complicated but has the advantage of allowing easier control and customisation of individual classes where necessary.
-
-The bytecode is stripped of all labels, comments and identifiers to minify it as much as possible, though the result may be extractable through a decompiler.
-
-Using compile-time annotations to explicitly generate the classes was considered as an alternative option, but I decided against this approach because I felt it would compromise the integrity of plugins by adding extra classes and had a higher potential for error.
-
-### Best Practices
-
-Below are detailed some of the best practices for using SkriptLab in the most efficient manner. Note: using SkriptLab in other ways is absolutely fine, but these tips will minimise overhead.
-
-The `@Condition` annotation is fastest on public primitive (boolean) members. If placed on a `public boolean` method or field, the generated bytecode will use a direct access which takes nanoseconds, whereas if used on a non-public boolean field or a non-primitive `Boolean` type it must use reflection under the hood. The finality of the member does not matter.
-
-The `@Effect` annotation is fastest when used on a public method. When used on a dynamic method, the first `%type%` input of the effect is assumed to be the object on which to call the method. A regular accessor is generated for all possible cases.
-
-Using the `@EventValue` annotation is only possible on public dynamic methods. It may be possible on primitive methods but this can cause issues with the generated `Getter<V,E>` generic typing (since primitive generics are technically illegal!)
+SkriptLab will attempt to generate sensible and legible syntax automatically based on the method/class name, but
+this can be manually overridden (such as when inputs are required) with the annotation value.
