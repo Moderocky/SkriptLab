@@ -6,8 +6,9 @@ import mx.kenzie.skriptlab.template.DirectExpression;
 
 public record Syntax
     <Handler extends SyntaxElement>
-    (Class<? extends SyntaxElement> type, Handler handler, String... patterns) {
+    (Class<? extends SyntaxElement> type, Handler handler, String... patterns) implements Registered {
     
+    @Override
     @SuppressWarnings("unchecked")
     public void register() {
         if (Section.class.isAssignableFrom(type))

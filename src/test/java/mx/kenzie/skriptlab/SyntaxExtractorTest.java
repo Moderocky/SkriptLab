@@ -40,8 +40,8 @@ public class SyntaxExtractorTest {
         final SyntaxExtractor extractor = new SyntaxExtractor(new SyntaxGenerator());
         extractor.prepare(Dummy.class);
         extractor.divine();
-        final List<Syntax<?>> list = new ArrayList<>();
-        extractor.makeSyntax(list);
+        final List<Registered> list = new ArrayList<>();
+        extractor.collect(list);
     }
     
     @Test

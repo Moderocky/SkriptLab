@@ -45,12 +45,16 @@ public class SyntaxGenerator extends ClassLoader {
      * @param source the source class to read
      * @return a collection of the unregistered syntax objects
      */
-    public Collection<Syntax<?>> generateSyntaxFrom(Class<?> source) {
-        final List<Syntax<?>> list = new ArrayList<>();
-        final SyntaxExtractor extractor = new SyntaxExtractor(this);
-        extractor.prepare(source);
-        extractor.divine();
-        extractor.makeSyntax(list);
+    public Collection<Registered> generateSyntaxFrom(Class<?> source) {
+        final List<Registered> list = new ArrayList<>();
+        final SyntaxExtractor syntax = new SyntaxExtractor(this);
+        syntax.prepare(source);
+        syntax.divine();
+        syntax.collect(list);
+        final TypeExtractor types = new TypeExtractor(this);
+        types.prepare(source);
+        types.divine();
+        types.collect(list);
         return list;
     }
     
