@@ -12,19 +12,20 @@ import mx.kenzie.skriptlab.template.DirectPropertyCondition;
 import java.lang.reflect.*;
 import java.util.*;
 
-public class SyntaxExtractor {
+public class SyntaxExtractor extends Extractor {
     
-    protected final SyntaxGenerator generator;
-    protected Class<?> source;
     protected Set<MaybeSyntax> syntax;
     protected Set<MaybeEffect> effects;
     protected Set<MaybeCondition> conditions;
     protected Set<MaybeExpression> expressions;
     
-    protected SyntaxExtractor(SyntaxGenerator generator) {this.generator = generator;}
+    protected SyntaxExtractor(SyntaxGenerator generator) {
+        super(generator);
+    }
     
+    @Override
     public void prepare(Class<?> source) {
-        this.source = source;
+        super.prepare(source);
         this.syntax = new HashSet<>();
         this.effects = new HashSet<>();
         this.conditions = new HashSet<>();
@@ -117,7 +118,8 @@ public class SyntaxExtractor {
         return new MaybeExpression(method, expression);
     }
     
-    public void makeSyntax(List<Syntax<?>> list) {
+    @Override
+    public void collect(List<Registered> list) {
         for (final MaybeSyntax syntax : syntax) list.add(syntax.generate());
     }
     
